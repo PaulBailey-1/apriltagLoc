@@ -4,6 +4,7 @@ project( locator )
 
 set(sources 
     "src/main.cpp"
+    "src/Pose.cpp"
 )
 
 include_directories("include/")
