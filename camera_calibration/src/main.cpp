@@ -30,7 +30,7 @@ int main()
   // Extracting path of individual image stored in a given directory
   std::vector<cv::String> images;
   // Path of the folder containing checkerboard images
-  std::string path = "../take_pics/images/image*.jpg";
+  std::string path = "../locator/images/image*.jpg";
 
   cv::glob(path, images);
 
@@ -68,9 +68,12 @@ int main()
       
       objpoints.push_back(objp);
       imgpoints.push_back(corner_pts);
+      std::cout << "Found\n";
     }
+    cv::Mat small;
+    cv::resize(frame, small, cv::Size(640, 480));
 
-    cv::imshow("Image",frame);
+    cv::imshow("Image", small);
     cv::waitKey(0);
   }
 

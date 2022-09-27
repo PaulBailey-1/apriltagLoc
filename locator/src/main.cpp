@@ -8,7 +8,8 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/mman.h>
-#include <linux/videodev2.h>
+#include <iostream>
+#include <fstream>
 
 #include "opencv2/opencv.hpp"
 
@@ -25,7 +26,7 @@ int main(int argc, char *argv[]) {
 
     getopt_t* getopt = getopt_create();
 
-    getopt_add_int(getopt, 'r', "resolution", "4", "Divide base resolution by this factor");
+    getopt_add_double(getopt, 'r', "resolution", "4", "Divide base resolution by this factor [1,2,4,8]");
     getopt_add_double(getopt, 'd', "decimate", "1.0", "Decimate input image by this factor");
     getopt_add_double(getopt, 'b', "blur", "0.0", "Apply low-pass blur to input");
     getopt_add_int(getopt, 's', "show", "1", "Show video stream");
@@ -38,9 +39,11 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Enabling video capture" << std::endl;
 
+    double resolution = getopt_get_double(getopt, "resolution");
+
     const char* dev_name = "/dev/video0";
-    int width = 2560 / getopt_get_int(getopt, "resolution");
-    int height = 1920 / getopt_get_int(getopt, "resolution");
+    int width = 2560 / resolution;
+    int height = 1920 / resolution;
     int maxFPS = 90;
 
     int widthDisplay = 640;
@@ -72,17 +75,27 @@ int main(int argc, char *argv[]) {
         maxFPS << "FPS" << std::endl;
 
     apriltag_detection_info_t info;
+
     info.tagsize = 0.149;
-    info.fx = 571.8367321574847;
-    info.fy = 572.8478769322065;
-    info.cx = 308.4643624352032;
-    info.cy = 248.84989598432;
+    info.fx = 2302.112591519656 / resolution;
+    info.fy = 2310.756855749991 / resolution;
+    info.cx = 1222.642586729275 / resolution;
+    info.cy = 1035.101714388221 / resolution;
 
     cv::Mat frame, gray;
     cv::TickMeter timer;
     float fps = 0.0;
     int every = 10;
     double sum = 0.0;
+
+    int imageIdx = 0;
+    std::fstream idxFile;
+    std::string idxFilePath = "./images/idx";
+    idxFile.open(idxFilePath, std::ios::in);
+    if (idxFile.is_open()) {
+        idxFile >> imageIdx;
+    }
+    idxFile.close();
 
     while (true) {
         timer.start();
@@ -110,6 +123,7 @@ int main(int argc, char *argv[]) {
             Pose pose(apPose);
             pose.print();
         }
+        
 
         int fontface = cv::FONT_HERSHEY_SIMPLEX;
         double fontscale = 1.0;
@@ -151,7 +165,7 @@ int main(int argc, char *argv[]) {
         }
         every++;
 
-        if (getopt_get_bool(getopt, "show")) {
+        if (getopt_get_int(getopt, "show") == 1) {
 
             cv::Mat outFrame;
             cv::resize(frame, outFrame, cv::Size(widthDisplay, heightDisplay));
@@ -165,6 +179,16 @@ int main(int argc, char *argv[]) {
             cv::line(outFrame, cv::Point(widthDisplay / 2, heightDisplay / 2 - crossSize), cv::Point(widthDisplay / 2, heightDisplay / 2 + crossSize), cv::Scalar(0, 0, 0xff));
 
             cv::imshow("Tag Detections", outFrame);
+
+            if (k == 115) { // s
+                std::string imageName = "./images/image" + std::to_string(imageIdx) + ".jpg";
+                cv::imwrite(imageName, frame);
+                std::cout << "Saved image to " << imageName << std::endl;
+                imageIdx++;
+                idxFile.open(idxFilePath, std::ofstream::out | std::ofstream::trunc);
+                idxFile << imageIdx;
+                idxFile.close();
+            }
 
         } else if (every == 10) {
             std::cout << "FPS: " << std::fixed << std::setprecision(1) << fps << std::endl;

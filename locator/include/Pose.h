@@ -21,4 +21,6 @@ private:
     double _x, _y, _z;
     double _roll, _pitch, _yaw;
 
+    double _totalDistance;
+
 };
