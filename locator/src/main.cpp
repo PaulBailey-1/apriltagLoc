@@ -111,6 +111,7 @@ int main(int argc, char *argv[]) {
         };
 
         zarray_t *detections = apriltag_detector_detect(td, &im);
+        // zarray_t *detections = zarray_create(1);
 
         int k = cv::pollKey();
         if (k == 27) {
