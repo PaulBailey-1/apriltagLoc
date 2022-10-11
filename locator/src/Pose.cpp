@@ -6,7 +6,7 @@ Pose::Pose(apriltag_pose_t pose) {
     _y = matd_get(pose.t, 1, 0);
     _z = matd_get(pose.t, 2, 0);
 
-    _totalDistance = sqrt(pow(_x, 2) + pow(_y, 2) + pow(_z, 2));
+    _distance = sqrt(pow(_x, 2) + pow(_y, 2) + pow(_z, 2));
 
     double m00 = matd_get(pose.R, 0, 0);
     double m10 = matd_get(pose.R, 1, 0);
@@ -37,6 +37,6 @@ Pose::Pose(apriltag_pose_t pose) {
 }
 
 void Pose::print() {
-    printf("Translation-\nX: %f\nY: %f\nZ: %f\nTotal Distance: %f\n", _x, _y, _z, _totalDistance);
+    printf("Translation-\nX: %f\nY: %f\nZ: %f\nTotal Distance: %f\n", _x, _y, _z, _distance);
     printf("Rotation-\nYaw: %f\nPitch: %f\nRoll: %f\n", _yaw, _pitch, _roll);
 }

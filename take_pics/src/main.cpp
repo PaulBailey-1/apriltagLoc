@@ -10,12 +10,12 @@
 int main() {
 
   int width = 640;
-  int height = 480;
+  int height = 400;
 
   cv::VideoCapture cap(0);
-  cap.set(cv::CAP_PROP_FRAME_WIDTH, width);
-  cap.set(cv::CAP_PROP_FRAME_HEIGHT, height);
-  cap.set(cv::CAP_PROP_FPS, 30);
+  // cap.set(cv::CAP_PROP_FRAME_WIDTH, width);
+  // cap.set(cv::CAP_PROP_FRAME_HEIGHT, height);
+  // cap.set(cv::CAP_PROP_FPS, 30);
 
   if (!cap.isOpened()) {
     printf("Error: Couldn't open camera\n");
@@ -24,13 +24,14 @@ int main() {
 
   int idx = 0;
 
-  cv::Mat frame;
+  cv::Mat frame, out;
 
   while (true) {
     cap >> frame;
     // printf("Got frame %i x %i\n", frame.cols, frame.rows);
 
-    imshow("Camera", frame);
+    cv::resize(frame, out, cv::Size(width, height));
+    imshow("Camera", out);
     int k = cv::pollKey();
     if (k == 27) { // esc
       break;
@@ -43,9 +44,9 @@ int main() {
         idx++;
       }
     }
-    // if (k != -1) {
-    //   printf("%i\n", k);
-    // }
+    if (k != -1) {
+      printf("%i\n", k);
+    }
 
   }
 

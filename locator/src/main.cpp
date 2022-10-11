@@ -10,6 +10,7 @@
 #include <sys/mman.h>
 #include <iostream>
 #include <fstream>
+#include <thread>
 
 #include "opencv2/opencv.hpp"
 
@@ -26,7 +27,6 @@ int main(int argc, char *argv[]) {
 
     getopt_t* getopt = getopt_create();
 
-    getopt_add_double(getopt, 'r', "resolution", "4", "Divide base resolution by this factor [1,2,4,8]");
     getopt_add_double(getopt, 'd', "decimate", "1.0", "Decimate input image by this factor");
     getopt_add_double(getopt, 'b', "blur", "0.0", "Apply low-pass blur to input");
     getopt_add_int(getopt, 's', "show", "1", "Show video stream");
@@ -39,24 +39,18 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Enabling video capture" << std::endl;
 
-    double resolution = getopt_get_double(getopt, "resolution");
-
     const char* dev_name = "/dev/video0";
-    int width = 2560 / resolution;
-    int height = 1920 / resolution;
-    int maxFPS = 90;
+    int width = 1280;
+    int height = 800;
 
     int widthDisplay = 640;
-    int heightDisplay = 480;
+    int heightDisplay = 400;
 
     cv::VideoCapture cap(0);
     if (!cap.isOpened()) {
         std::cerr << "Couldn't open video capture device" << std::endl;
         return -1;
     }
-    cap.set(cv::CAP_PROP_FRAME_WIDTH, width);
-    cap.set(cv::CAP_PROP_FRAME_HEIGHT, height);
-    cap.set(cv::CAP_PROP_FPS, maxFPS);
 
     apriltag_family_t *tf = tag36h11_create();
     apriltag_detector_t *td = apriltag_detector_create();
@@ -70,23 +64,22 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Detector tag36h11 initialized\n";
 
-    std::cout << width << "x" <<
-        height << " @" <<
-        maxFPS << "FPS" << std::endl;
+    std::cout << width << "x" << height << std::endl;
 
     apriltag_detection_info_t info;
 
     info.tagsize = 0.149;
-    info.fx = 2302.112591519656 / resolution;
-    info.fy = 2310.756855749991 / resolution;
-    info.cx = 1222.642586729275 / resolution;
-    info.cy = 1035.101714388221 / resolution;
+    info.fx = 1120.556787989777;
+    info.fy = 1125.442975043206;
+    info.cx = 634.3519601327893;
+    info.cy = 406.9630521749576;
 
-    cv::Mat frame, gray;
+    cv::Mat frame, grey;
     cv::TickMeter timer;
     float fps = 0.0;
-    int every = 10;
+    int every = 0;
     double sum = 0.0;
+    const int fpsDisplay = 10;
 
     int imageIdx = 0;
     std::fstream idxFile;
@@ -97,32 +90,82 @@ int main(int argc, char *argv[]) {
     }
     idxFile.close();
 
+    bool running = false;
+    double actual = 0.0;
+    std::string data = "";
+
     while (true) {
         timer.start();
         errno = 0;
+
         cap >> frame;
-        cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+        cvtColor(frame, grey, cv::COLOR_BGR2GRAY);
 
         image_u8_t im = { 
-            .width = gray.cols,
-            .height = gray.rows,
-            .stride = gray.cols,
-            .buf = gray.data
+            .width = grey.cols,
+            .height = grey.rows,
+            .stride = grey.cols,
+            .buf = grey.data
         };
 
         zarray_t *detections = apriltag_detector_detect(td, &im);
         // zarray_t *detections = zarray_create(1);
 
         int k = cv::pollKey();
-        if (k == 27) {
+        if (k == 27) { // esc
             break;
         } 
-        if (k == 32 && detections->size > 0) {
+        if (k == 32 && detections->size > 0) { // space
             zarray_get(detections, 0, &info.det);
             apriltag_pose_t apPose;
             double err = estimate_tag_pose(&info, &apPose);
             Pose pose(apPose);
             pose.print();
+        }
+
+        if (running) {
+
+            double measured = -1.0;
+            if (zarray_size(detections) > 0) {
+                zarray_get(detections, 0, &info.det);
+                apriltag_pose_t apPose;
+                double err = estimate_tag_pose(&info, &apPose);
+                Pose pose(apPose);
+                measured = pose.getDistance();
+            }
+            double error = abs(actual - measured) * 100;
+            data += std::to_string(measured) + ", " + std::to_string(error) + ", ";
+            std::cout << td->quad_decimate << " decimation - " << error << " cm error" << std::endl;
+
+            if (td->quad_decimate < 2) {
+                td->quad_decimate += 0.5;
+            } else if (td->quad_decimate < 9) {
+                td->quad_decimate += 1;
+            } else {
+                running = false;
+                data += "\n";
+                td->quad_decimate = 1;
+                std::cout << "Finished Test\n\n";
+            }
+        }
+
+        if (k == 111) { // o
+            std::ofstream dataFile;
+            dataFile.open("data.csv");
+            dataFile << data;
+            dataFile.close();
+            std::cout << "Output data to data.csv\n";
+        }
+
+        if (k == 114) { // r
+            std::cout << "Running Tests. Input actual distance in inches:\n";
+            running = true;
+            td->quad_decimate = 1.0;
+            double actualIn = 0.0;
+            std::cin.clear();
+            std::cin >> actualIn;
+            actual = actualIn * 0.0254;
+            data += std::to_string(actualIn) + ", " + std::to_string(actual) + ", ";
         }
         
 
@@ -159,12 +202,12 @@ int main(int argc, char *argv[]) {
         timer.stop();
 
         sum += timer.getTimeSec();
-        if (every == 10) {
-            fps = 10 / sum;
+        every++;
+        if (every == fpsDisplay) {
+            fps = fpsDisplay / sum;
             every = 0;
             sum = 0.0;
         }
-        every++;
 
         if (getopt_get_int(getopt, "show") == 1) {
 
@@ -191,7 +234,7 @@ int main(int argc, char *argv[]) {
                 idxFile.close();
             }
 
-        } else if (every == 10) {
+        } else if (every == 0) {
             std::cout << "FPS: " << std::fixed << std::setprecision(1) << fps << std::endl;
         }
         

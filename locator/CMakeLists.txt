@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 2.8)
 
 project( locator )
 
+set(CMAKE_BUILD_TYPE Debug)
+
 set(sources 
     "src/main.cpp"
     "src/Pose.cpp"
