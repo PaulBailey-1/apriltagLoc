@@ -22,20 +22,27 @@ extern "C" {
 }
 
 #include "Pose.h"
+#include "Point.h"
 
 int main(int argc, char *argv[]) {
 
     getopt_t* getopt = getopt_create();
 
-    getopt_add_double(getopt, 'd', "decimate", "1.0", "Decimate input image by this factor");
+    getopt_add_double(getopt, 'd', "decimate", "4.0", "Decimate input image by this factor");
     getopt_add_double(getopt, 'b', "blur", "0.0", "Apply low-pass blur to input");
     getopt_add_int(getopt, 's', "show", "1", "Show video stream");
+    getopt_add_int(getopt, 'r', "rotate", "0", "Rotates camera feed [0-2]");
 
     if (!getopt_parse(getopt, argc, argv, 1)) {
         printf("Usage: %s [options]\n", argv[0]);
         getopt_do_usage(getopt);
         exit(0);
     }
+
+    std::map<int, Point> tagPoints = {
+        {1, {0.0, 0.0}},
+        {7, {0.52, 0.0}}
+    };
 
     std::cout << "Enabling video capture" << std::endl;
 
@@ -45,6 +52,16 @@ int main(int argc, char *argv[]) {
 
     int widthDisplay = 640;
     int heightDisplay = 400;
+
+    if (getopt_get_int(getopt, "rotate") == 0 || getopt_get_int(getopt, "rotate") == 2) {
+        int temp = width;
+        width = height;
+        height = temp;
+
+        temp = widthDisplay;
+        widthDisplay = heightDisplay;
+        heightDisplay = temp;
+    }
 
     cv::VideoCapture cap(0);
     if (!cap.isOpened()) {
@@ -64,7 +81,7 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Detector tag36h11 initialized\n";
 
-    std::cout << width << "x" << height << std::endl;
+    std::cout << width << "x" << height << " Decimation: " << getopt_get_double(getopt, "decimate") << std::endl;
 
     apriltag_detection_info_t info;
 
@@ -74,7 +91,7 @@ int main(int argc, char *argv[]) {
     info.cx = 634.3519601327893;
     info.cy = 406.9630521749576;
 
-    cv::Mat frame, grey;
+    cv::Mat frameRaw, frame, grey;
     cv::TickMeter timer;
     float fps = 0.0;
     int every = 0;
@@ -98,7 +115,13 @@ int main(int argc, char *argv[]) {
         timer.start();
         errno = 0;
 
-        cap >> frame;
+        if (getopt_get_int(getopt, "rotate") != -1) {
+            cap >> frameRaw;
+            cv::rotate(frameRaw, frame, getopt_get_int(getopt, "rotate"));
+        } else {
+            cap >> frame;
+        }
+        
         cvtColor(frame, grey, cv::COLOR_BGR2GRAY);
 
         image_u8_t im = { 
@@ -126,16 +149,20 @@ int main(int argc, char *argv[]) {
         if (running) {
 
             double measured = -1.0;
+            std::cout << td->quad_decimate << " decimation: ";
             if (zarray_size(detections) > 0) {
                 zarray_get(detections, 0, &info.det);
                 apriltag_pose_t apPose;
                 double err = estimate_tag_pose(&info, &apPose);
                 Pose pose(apPose);
                 measured = pose.getDistance();
+
+                double error = abs(actual - measured) * 100;
+                data += std::to_string(measured) + ", " + std::to_string(error) + ", ";
+                std::cout << error << " cm error" << std::endl;
+            } else {
+                std::cout  << "-1 cm error" << std::endl;
             }
-            double error = abs(actual - measured) * 100;
-            data += std::to_string(measured) + ", " + std::to_string(error) + ", ";
-            std::cout << td->quad_decimate << " decimation - " << error << " cm error" << std::endl;
 
             if (td->quad_decimate < 2) {
                 td->quad_decimate += 0.5;
@@ -151,7 +178,7 @@ int main(int argc, char *argv[]) {
 
         if (k == 111) { // o
             std::ofstream dataFile;
-            dataFile.open("data.csv");
+            dataFile.open("data.csv", std::ios_base::app);
             dataFile << data;
             dataFile.close();
             std::cout << "Output data to data.csv\n";
@@ -161,11 +188,63 @@ int main(int argc, char *argv[]) {
             std::cout << "Running Tests. Input actual distance in inches:\n";
             running = true;
             td->quad_decimate = 1.0;
-            double actualIn = 0.0;
-            std::cin.clear();
-            std::cin >> actualIn;
-            actual = actualIn * 0.0254;
-            data += std::to_string(actualIn) + ", " + std::to_string(actual) + ", ";
+            std::string in;
+            std::getline(std::cin, in, '\n');
+            actual = std::stof(in) * 0.0254;
+            data += in + ", " + std::to_string(actual) + ", ";
+        }
+
+        if (k == 116) { // t
+            if (zarray_size(detections) < 2) {
+                std::cout << "Triangulation Failed: Need at least 2 tags\n";
+            } else {
+                Point t1;
+                Point t2;
+
+                apriltag_detection_t *det1;
+                apriltag_detection_t *det2;
+                zarray_get(detections, 0, &det1);
+                zarray_get(detections, 1, &det2);
+
+                apriltag_pose_t apPose;
+                info.det = det1;
+                double err = estimate_tag_pose(&info, &apPose);
+                Pose t1Pose(apPose);
+
+                info.det = det2;
+                err = estimate_tag_pose(&info, &apPose);
+                Pose t2Pose(apPose);
+
+                float r1 = t1Pose.getDistance();
+                float r2 = t2Pose.getDistance();
+
+                try {
+
+                    t1 = tagPoints.at(det1->id);
+                    t2 = tagPoints.at(det2->id);
+
+                    float d = sqrt(pow(t1.x - t2.x, 2) + pow(t1.y - t1.y, 2));
+                    float l = (pow(r1, 2) - pow(r2, 2) + pow(d, 2)) / (2 * d);
+                    float h = sqrt(pow(r1, 2) - pow(l, 2));
+
+                    float x = (l / d) * (t2.x - t1.x) + (h / d) * (t2.y - t1.y) + t1.x;
+                    float y = (l / d) * (t2.y - t1.y) - (h / d) * (t2.x - t1.x) + t1.y;
+
+                    float x2 = (l / d) * (t2.x - t1.x) - (h / d) * (t2.y - t1.y) + t1.x;
+                    float y2 = (l / d) * (t2.y - t1.y) + (h / d) * (t2.x - t1.x) + t1.y;
+
+                    x *= 39.3701;
+                    y *= 39.3701;
+                    x2 *= 39.3701;
+                    y2 *= 39.3701;
+
+                    std::cout << "Position: (" << x << ", " << y << ") or (" << x2 << ", " << y2 << ")\n";
+
+                } catch(const std::exception& e) {
+                    std::cout << "Triangulation Error: Position not known for tags\n";
+                }
+                    
+            }
         }
         
 
