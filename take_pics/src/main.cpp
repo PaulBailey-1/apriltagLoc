@@ -24,11 +24,28 @@ int main() {
 
   int idx = 0;
 
-  cv::Mat frame, out;
+  cv::Mat frame, frame2, out;
+  cv::TickMeter timer;
+  float fps = 0.0;
+  int every = 0;
+  double sum = 0.0;
+  const int fpsDisplay = 10;
 
   while (true) {
+    timer.start();
     cap >> frame;
     // printf("Got frame %i x %i\n", frame.cols, frame.rows);
+
+    timer.stop();
+
+    sum += timer.getTimeSec();
+    every++;
+    if (every == fpsDisplay) {
+        fps = fpsDisplay / sum;
+        std::cout << fps << std::endl;
+        every = 0;
+        sum = 0.0;
+    }
 
     cv::resize(frame, out, cv::Size(width, height));
     imshow("Camera", out);
@@ -47,6 +64,8 @@ int main() {
     if (k != -1) {
       printf("%i\n", k);
     }
+
+    timer.reset();
 
   }
 

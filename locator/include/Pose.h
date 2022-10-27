@@ -15,6 +15,7 @@ public:
     Pose(apriltag_pose_t pose);
 
     void print();
+    void printIn();
 
     double getDistance() {
         return _distance;

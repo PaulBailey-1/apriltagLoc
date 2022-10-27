@@ -40,3 +40,8 @@ void Pose::print() {
     printf("Translation-\nX: %f\nY: %f\nZ: %f\nTotal Distance: %f\n", _x, _y, _z, _distance);
     printf("Rotation-\nYaw: %f\nPitch: %f\nRoll: %f\n", _yaw, _pitch, _roll);
 }
+
+void Pose::printIn() {
+    printf("Translation-\nX: %f\nY: %f\nZ: %f\nTotal Distance: %f\n", _x * 39.3701, _y * 39.3701, _z * 39.3701, _distance * 39.3701);
+    printf("Rotation-\nYaw: %f\nPitch: %f\nRoll: %f\n", _yaw, _pitch, _roll);
+}

@@ -31,7 +31,8 @@ int main(int argc, char *argv[]) {
     getopt_add_double(getopt, 'd', "decimate", "4.0", "Decimate input image by this factor");
     getopt_add_double(getopt, 'b', "blur", "0.0", "Apply low-pass blur to input");
     getopt_add_int(getopt, 's', "show", "1", "Show video stream");
-    getopt_add_int(getopt, 'r', "rotate", "0", "Rotates camera feed [0-2]");
+    getopt_add_int(getopt, 'r', "rotate", "0", "Rotates camera feed [0-3]");
+    getopt_add_int(getopt, 'c', "camera", "0", "0 - picamera, 1 - OV9281");
 
     if (!getopt_parse(getopt, argc, argv, 1)) {
         printf("Usage: %s [options]\n", argv[0]);
@@ -39,21 +40,55 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
+    if (getopt_get_int(getopt, "show") == 1) {
+        cv::namedWindow("Tag Detections");
+    }
+
+
     std::map<int, Point> tagPoints = {
-        {1, {0.0, 0.0}},
-        {7, {0.52, 0.0}}
+        {6, {0.0, 0.0}},
+        {8, {74 * 0.0254, 0.0}}
     };
 
     std::cout << "Enabling video capture" << std::endl;
 
     const char* dev_name = "/dev/video0";
-    int width = 1280;
-    int height = 800;
+    int width;
+    int height;
 
     int widthDisplay = 640;
-    int heightDisplay = 400;
+    int heightDisplay = 480;
 
-    if (getopt_get_int(getopt, "rotate") == 0 || getopt_get_int(getopt, "rotate") == 2) {
+    apriltag_detection_info_t info;
+
+    info.tagsize = 0.149;
+
+    switch(getopt_get_int(getopt, "camera")) {
+        case 0:
+            width = 2560;
+            height = 1920;
+
+            info.fx = 571.8367321574847 * 4;
+            info.fy = 572.8478769322065 * 4;
+            info.cx = 308.4643624352032 * 4;
+            info.cy = 248.84989598432 * 4;
+
+            break;
+        case 1:
+            width = 1280;
+            height = 800;
+
+            info.fx = 1120.556787989777;
+            info.fy = 1125.442975043206;
+            info.cx = 634.3519601327893;
+            info.cy = 406.9630521749576;
+
+            break;
+        default:
+            break;
+    }
+
+    if (getopt_get_int(getopt, "rotate") == 1 || getopt_get_int(getopt, "rotate") == 3) {
         int temp = width;
         width = height;
         height = temp;
@@ -73,7 +108,7 @@ int main(int argc, char *argv[]) {
     apriltag_detector_t *td = apriltag_detector_create();
     apriltag_detector_add_family(td, tf);
 
-    td->quad_decimate = getopt_get_double(getopt, "decimate");
+    // td->quad_decimate = getopt_get_double(getopt, "decimate");
     td->quad_sigma = getopt_get_double(getopt, "blur");
     td->nthreads = 4;
     td->debug = false;
@@ -83,15 +118,7 @@ int main(int argc, char *argv[]) {
 
     std::cout << width << "x" << height << " Decimation: " << getopt_get_double(getopt, "decimate") << std::endl;
 
-    apriltag_detection_info_t info;
-
-    info.tagsize = 0.149;
-    info.fx = 1120.556787989777;
-    info.fy = 1125.442975043206;
-    info.cx = 634.3519601327893;
-    info.cy = 406.9630521749576;
-
-    cv::Mat frameRaw, frame, grey;
+    cv::Mat frameRaw, frame, grey, greyDecimated;
     cv::TickMeter timer;
     float fps = 0.0;
     int every = 0;
@@ -107,32 +134,32 @@ int main(int argc, char *argv[]) {
     }
     idxFile.close();
 
-    bool running = false;
-    double actual = 0.0;
     std::string data = "";
 
     while (true) {
         timer.start();
         errno = 0;
 
-        if (getopt_get_int(getopt, "rotate") != -1) {
+        if (getopt_get_int(getopt, "rotate") != 0) {
             cap >> frameRaw;
-            cv::rotate(frameRaw, frame, getopt_get_int(getopt, "rotate"));
+            cv::rotate(frameRaw, frame, getopt_get_int(getopt, "rotate") - 1);
         } else {
             cap >> frame;
         }
-        
+
         cvtColor(frame, grey, cv::COLOR_BGR2GRAY);
+        double decimation = getopt_get_double(getopt, "decimate");
+        cv::resize(grey, greyDecimated, cv::Size(), 1 / decimation, 1 / decimation, cv::INTER_NEAREST);
 
         image_u8_t im = { 
-            .width = grey.cols,
-            .height = grey.rows,
-            .stride = grey.cols,
-            .buf = grey.data
+            .width = greyDecimated.cols,
+            .height = greyDecimated.rows,
+            .stride = greyDecimated.cols,
+            .buf = greyDecimated.data
         };
 
-        zarray_t *detections = apriltag_detector_detect(td, &im);
-        // zarray_t *detections = zarray_create(1);
+        // zarray_t *detections = apriltag_detector_detect(td, &im);
+        zarray_t *detections = zarray_create(1);
 
         int k = cv::pollKey();
         if (k == 27) { // esc
@@ -143,37 +170,8 @@ int main(int argc, char *argv[]) {
             apriltag_pose_t apPose;
             double err = estimate_tag_pose(&info, &apPose);
             Pose pose(apPose);
-            pose.print();
-        }
-
-        if (running) {
-
-            double measured = -1.0;
-            std::cout << td->quad_decimate << " decimation: ";
-            if (zarray_size(detections) > 0) {
-                zarray_get(detections, 0, &info.det);
-                apriltag_pose_t apPose;
-                double err = estimate_tag_pose(&info, &apPose);
-                Pose pose(apPose);
-                measured = pose.getDistance();
-
-                double error = abs(actual - measured) * 100;
-                data += std::to_string(measured) + ", " + std::to_string(error) + ", ";
-                std::cout << error << " cm error" << std::endl;
-            } else {
-                std::cout  << "-1 cm error" << std::endl;
-            }
-
-            if (td->quad_decimate < 2) {
-                td->quad_decimate += 0.5;
-            } else if (td->quad_decimate < 9) {
-                td->quad_decimate += 1;
-            } else {
-                running = false;
-                data += "\n";
-                td->quad_decimate = 1;
-                std::cout << "Finished Test\n\n";
-            }
+            std::cout << "Tag: " << info.det->id << "\n";
+            pose.printIn();
         }
 
         if (k == 111) { // o
@@ -186,12 +184,42 @@ int main(int argc, char *argv[]) {
 
         if (k == 114) { // r
             std::cout << "Running Tests. Input actual distance in inches:\n";
-            running = true;
             td->quad_decimate = 1.0;
             std::string in;
+            std::cin.clear();
             std::getline(std::cin, in, '\n');
-            actual = std::stof(in) * 0.0254;
+            float actual = std::stof(in) * 0.0254;
             data += in + ", " + std::to_string(actual) + ", ";
+
+            while(td->quad_decimate < 10) {
+
+                detections = apriltag_detector_detect(td, &im);
+
+                double measured = -1.0;
+                std::cout << td->quad_decimate << " decimation: ";
+                if (zarray_size(detections) > 0) {
+                    zarray_get(detections, 0, &info.det);
+                    apriltag_pose_t apPose;
+                    double err = estimate_tag_pose(&info, &apPose);
+                    Pose pose(apPose);
+                    measured = pose.getDistance();
+
+                    double error = abs(actual - measured) * 100;
+                    data += std::to_string(error) + ", ";
+                    std::cout << error << " cm error" << std::endl;
+                } else {
+                    std::cout  << "-1 cm error" << std::endl;
+                }
+
+                if (td->quad_decimate < 2) {
+                    td->quad_decimate += 0.5;
+                } else {
+                    td->quad_decimate += 1;
+                }
+            }
+            data += "\n";
+            td->quad_decimate = 1;
+            std::cout << "Finished Test\n\n";
         }
 
         if (k == 116) { // t
@@ -218,6 +246,12 @@ int main(int argc, char *argv[]) {
                 float r1 = t1Pose.getDistance();
                 float r2 = t2Pose.getDistance();
 
+                std::cout << "Enter distance between tags in inches: \n";
+                std::string in;
+                std::cin.clear();
+                std::getline(std::cin, in, '\n');
+                tagPoints[8].x = 0.0254 * stoi(in);
+
                 try {
 
                     t1 = tagPoints.at(det1->id);
@@ -230,15 +264,10 @@ int main(int argc, char *argv[]) {
                     float x = (l / d) * (t2.x - t1.x) + (h / d) * (t2.y - t1.y) + t1.x;
                     float y = (l / d) * (t2.y - t1.y) - (h / d) * (t2.x - t1.x) + t1.y;
 
-                    float x2 = (l / d) * (t2.x - t1.x) - (h / d) * (t2.y - t1.y) + t1.x;
-                    float y2 = (l / d) * (t2.y - t1.y) + (h / d) * (t2.x - t1.x) + t1.y;
-
                     x *= 39.3701;
                     y *= 39.3701;
-                    x2 *= 39.3701;
-                    y2 *= 39.3701;
 
-                    std::cout << "Position: (" << x << ", " << y << ") or (" << x2 << ", " << y2 << ")\n";
+                    std::cout << "Position: (" << x << ", " << y << ")\n";
 
                 } catch(const std::exception& e) {
                     std::cout << "Triangulation Error: Position not known for tags\n";
@@ -253,6 +282,7 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < zarray_size(detections); i++) {
             apriltag_detection_t *det;
             zarray_get(detections, i, &det);
+
             cv::line(frame, cv::Point(det->p[0][0], det->p[0][1]),
                      cv::Point(det->p[1][0], det->p[1][1]),
                      cv::Scalar(0, 0xff, 0), 2);
