@@ -13,9 +13,9 @@ int main() {
   int height = 400;
 
   cv::VideoCapture cap(0);
-  // cap.set(cv::CAP_PROP_FRAME_WIDTH, width);
-  // cap.set(cv::CAP_PROP_FRAME_HEIGHT, height);
-  // cap.set(cv::CAP_PROP_FPS, 30);
+  cap.set(cv::CAP_PROP_FRAME_WIDTH, width);
+  cap.set(cv::CAP_PROP_FRAME_HEIGHT, height);
+  cap.set(cv::CAP_PROP_FPS, 30);
 
   if (!cap.isOpened()) {
     printf("Error: Couldn't open camera\n");

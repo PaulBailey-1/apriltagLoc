@@ -31,8 +31,8 @@ int main(int argc, char *argv[]) {
     getopt_add_double(getopt, 'd', "decimate", "4.0", "Decimate input image by this factor");
     getopt_add_double(getopt, 'b', "blur", "0.0", "Apply low-pass blur to input");
     getopt_add_int(getopt, 's', "show", "1", "Show video stream");
-    getopt_add_int(getopt, 'r', "rotate", "0", "Rotates camera feed [0-3]");
-    getopt_add_int(getopt, 'c', "camera", "0", "0 - picamera, 1 - OV9281");
+    getopt_add_int(getopt, 'r', "rotate", "3", "Rotates camera feed [0-3]");
+    getopt_add_int(getopt, 'c', "camera", "1", "0 - picamera, 1 - OV9281");
 
     if (!getopt_parse(getopt, argc, argv, 1)) {
         printf("Usage: %s [options]\n", argv[0]);
@@ -104,6 +104,12 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
+    if (getopt_get_int(getopt, "camera") == 0) {
+        cap.set(cv::CAP_PROP_FRAME_WIDTH, width);
+        cap.set(cv::CAP_PROP_FRAME_HEIGHT, height);
+        cap.set(cv::CAP_PROP_FPS, 60);
+    }
+
     apriltag_family_t *tf = tag36h11_create();
     apriltag_detector_t *td = apriltag_detector_create();
     apriltag_detector_add_family(td, tf);
@@ -136,6 +142,9 @@ int main(int argc, char *argv[]) {
 
     std::string data = "";
 
+    bool logging = false;
+    std::string log = "";
+
     while (true) {
         timer.start();
         errno = 0;
@@ -148,18 +157,18 @@ int main(int argc, char *argv[]) {
         }
 
         cvtColor(frame, grey, cv::COLOR_BGR2GRAY);
-        double decimation = getopt_get_double(getopt, "decimate");
-        cv::resize(grey, greyDecimated, cv::Size(), 1 / decimation, 1 / decimation, cv::INTER_NEAREST);
+        // double decimation = getopt_get_double(getopt, "decimate");
+        // cv::resize(grey, greyDecimated, cv::Size(), 1 / decimation, 1 / decimation, cv::INTER_NEAREST);
 
         image_u8_t im = { 
-            .width = greyDecimated.cols,
-            .height = greyDecimated.rows,
-            .stride = greyDecimated.cols,
-            .buf = greyDecimated.data
+            .width = grey.cols,
+            .height = grey.rows,
+            .stride = grey.cols,
+            .buf = grey.data
         };
 
-        // zarray_t *detections = apriltag_detector_detect(td, &im);
-        zarray_t *detections = zarray_create(1);
+        zarray_t *detections = apriltag_detector_detect(td, &im);
+        // zarray_t *detections = zarray_create(1);
 
         int k = cv::pollKey();
         if (k == 27) { // esc
@@ -274,6 +283,23 @@ int main(int argc, char *argv[]) {
                 }
                     
             }
+        }
+
+        if (k == 108) { // l
+            if (!logging) {
+                logging = true;
+                std::cout << "Started logging\n";
+            } else {
+                std::ofstream logFile;
+                logFile.open("log.csv", std::ios_base::app);
+                logFile << log;
+                logFile.close();
+                std::cout << "Saved log\n";
+            }
+        }
+
+        if (logging) {
+            log += std::to_string(fps) + ", " + std::to_string(zarray_size(detections)) + "\n";
         }
         
 
