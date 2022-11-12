@@ -1,6 +1,8 @@
 #include "Pose.h"
 
-Pose::Pose(apriltag_pose_t pose) {
+Pose::Pose(apriltag_pose_t pose, int id) {
+
+    _id = id;
 
     _x = matd_get(pose.t, 0, 0);
     _y = matd_get(pose.t, 1, 0);

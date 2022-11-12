@@ -1,4 +1,7 @@
 
+#ifndef POSE_H
+#define POSE_H
+
 extern "C" {
 #include "apriltag_pose.h"
 }
@@ -12,13 +15,17 @@ class Pose {
 public:
 
     Pose(); 
-    Pose(apriltag_pose_t pose);
+    Pose(apriltag_pose_t pose, int id);
 
     void print();
     void printIn();
 
     double getDistance() {
         return _distance;
+    }
+
+    int getId() {
+        return _id;
     }
 
 private:
@@ -28,4 +35,8 @@ private:
 
     double _distance;
 
+    int _id;
+
 };
+
+#endif

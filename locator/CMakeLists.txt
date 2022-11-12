@@ -7,6 +7,9 @@ set(CMAKE_BUILD_TYPE Debug)
 set(sources 
     "src/main.cpp"
     "src/Pose.cpp"
+    "src/Display.cpp"
+    "src/Detector.cpp"
+    "src/Locator.cpp"
 )
 
 include_directories("include/")
