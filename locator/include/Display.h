@@ -26,6 +26,10 @@ public:
         _height = height;
     }
 
+    void setFps(float fps) {
+        _fps = fps;
+    }
+
 private:
 
     const int fontface = cv::FONT_HERSHEY_SIMPLEX;

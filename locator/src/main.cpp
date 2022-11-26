@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
     getopt_add_double(getopt, 'd', "decimate", "4.0", "Decimate input image by this factor");
     getopt_add_double(getopt, 'b', "blur", "0.0", "Apply low-pass blur to input");
     getopt_add_int(getopt, 's', "show", "1", "Show video stream");
-    getopt_add_int(getopt, 'r', "rotate", "3", "Rotates camera feed [0-3]");
+    getopt_add_int(getopt, 'r', "rotate", "2", "Rotates camera feed [0-3]");
     getopt_add_int(getopt, 'c', "camera", "1", "0 - picamera, 1 - OV9281");
 
     if (!getopt_parse(getopt, argc, argv, 1)) {
@@ -87,6 +87,7 @@ int main(int argc, char *argv[]) {
         }
 
         int k = cv::pollKey();
+        
         if (k == 27) { // esc
             break;
         }
@@ -114,6 +115,7 @@ int main(int argc, char *argv[]) {
                 } else {
                     std::ofstream logFile;
                     logFile.open("log.csv", std::ios_base::app);
+                    logFile << "FPS, Detections, PosX, PosY\n";
                     logFile << log;
                     logFile.close();
                     std::cout << "Saved log\n";
@@ -125,7 +127,8 @@ int main(int argc, char *argv[]) {
         }
 
         if (logging) {
-            log += std::to_string(fps) + ", " + std::to_string(detector->getDetectionsSize()) + "\n";
+            Point pos = locator->getPos();
+            log += std::to_string(fps) + ", " + std::to_string(detector->getDetectionsSize()) + ", " + std::to_string(pos.x) + ", " + std::to_string(pos.y) + "\n";
         }
 
         if (display != nullptr) {
@@ -141,6 +144,7 @@ int main(int argc, char *argv[]) {
         every++;
         if (every == fpsDisplay) {
             fps = fpsDisplay / sum;
+            display->setFps(fps);
             every = 0;
             sum = 0.0;
         }

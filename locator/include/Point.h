@@ -5,11 +5,11 @@ struct Point {
 
     float x, y;
 
-    Point operator*=(float mul) {
+    Point& operator*=(float mul) {
         Point newPoint;
-        newPoint.x = x * mul;
-        newPoint.y = y * mul;
-        return newPoint;
+        x *= mul;
+        y *= mul;
+        return *this;
     }
 };
 

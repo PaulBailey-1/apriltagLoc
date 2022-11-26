@@ -93,9 +93,11 @@ void Detector::run() {
     _detections = apriltag_detector_detect(_tagDetector, _img);
     // _detections = zarray_create(1);
 
+    _poses.clear();
+
     for (int i = 0; i < zarray_size(_detections); i++) {
 
-        zarray_get(_detections, 0, &_detectionInfo.det);
+        zarray_get(_detections, i, &_detectionInfo.det);
         apriltag_pose_t apPose;
         double err = estimate_tag_pose(&_detectionInfo, &apPose);
         _poses.push_back(Pose(apPose, _detectionInfo.det->id));

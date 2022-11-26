@@ -3,8 +3,8 @@
 Locator::Locator() {
 
     _tagPoints = {
-        {6, {0.0, 0.0}},
-        {8, {74 * 0.0254, 0.0}}
+        {1, {0.0, 0.0}},
+        {7, {21 * 0.0254, 0.0}}
     };
 
     _pos = {};
@@ -16,7 +16,7 @@ void Locator::run(std::vector<Pose> poses) {
     if (poses.size() > 1) {
         _posGood = triangulate(poses);
     } else {
-        std::cout << "Sorry!\n";
+        // std::cout << "Sorry!\n";
     }
 
 }
@@ -57,7 +57,6 @@ bool Locator::triangulate(std::vector<Pose> poses) {
 
         pos *= 39.3701;
         _pos = pos;
-
 
         return true;
 
