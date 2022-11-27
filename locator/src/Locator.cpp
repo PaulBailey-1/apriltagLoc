@@ -14,7 +14,8 @@ Locator::Locator() {
 void Locator::run(std::vector<Pose> poses) {
 
     if (poses.size() > 1) {
-        _posGood = triangulate(poses);
+        if (triangulate(poses))
+            _newPos = true;
     } else {
         // std::cout << "Sorry!\n";
     }

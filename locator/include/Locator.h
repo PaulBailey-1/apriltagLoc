@@ -18,8 +18,12 @@ public:
         return _pos;
     }
 
-    bool getPosGood() {
-        return _posGood;
+    bool newPos() {
+        if (_newPos) {
+            _newPos = false;
+            return true;
+        }
+        return false;
     }
 
 private:
@@ -27,7 +31,7 @@ private:
     std::map<int, Point> _tagPoints;
 
     Point _pos;
-    bool _posGood;
+    bool _newPos;
 
     bool triangulate(std::vector<Pose> poses);
 

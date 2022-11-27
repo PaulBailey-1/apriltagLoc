@@ -3,6 +3,7 @@ extern "C" {
     #include "apriltag.h"
     #include "apriltag_pose.h"
     #include "tag36h11.h"
+    #include "tag16h5.h"
 }
 
 #include "opencv2/videoio.hpp"

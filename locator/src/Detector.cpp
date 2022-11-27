@@ -98,10 +98,13 @@ void Detector::run() {
     for (int i = 0; i < zarray_size(_detections); i++) {
 
         zarray_get(_detections, i, &_detectionInfo.det);
-        apriltag_pose_t apPose;
-        double err = estimate_tag_pose(&_detectionInfo, &apPose);
-        _poses.push_back(Pose(apPose, _detectionInfo.det->id));
-
+        if (_detectionInfo.det->hamming == 0) {
+            apriltag_pose_t apPose;
+            double err = estimate_tag_pose(&_detectionInfo, &apPose);
+            _poses.push_back(Pose(apPose, _detectionInfo.det->id));
+        } else {
+            zarray_remove_index(_detections, i, true);
+        }
     }
 }
 

@@ -17,7 +17,12 @@ include_directories("include/")
 find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 find_package( apriltag REQUIRED )
+find_package( wpinet REQUIRED )
+find_package( ntcore REQUIRED )
+include_directories("/usr/local/include/ntcore")
+include_directories("/usr/local/include/wpiutil")
 
 add_executable( locator ${sources} )
 
-target_link_libraries( locator apriltag ${OpenCV_LIBS})
+target_compile_features( locator PUBLIC cxx_std_20)
+target_link_libraries( locator apriltag ntcore ${OpenCV_LIBS})
