@@ -1,5 +1,11 @@
 #include "Pose.h"
 
+#include <math.h>
+
+Pose::Pose() {
+
+}
+
 Pose::Pose(apriltag_pose_t pose, int id) {
 
     _id = id;
@@ -7,6 +13,7 @@ Pose::Pose(apriltag_pose_t pose, int id) {
     _x = matd_get(pose.t, 0, 0);
     _y = matd_get(pose.t, 1, 0);
     _z = matd_get(pose.t, 2, 0);
+    _angle = atan2(_x, _z);
 
     _distance = sqrt(pow(_x, 2) + pow(_y, 2) + pow(_z, 2));
 
@@ -41,9 +48,12 @@ Pose::Pose(apriltag_pose_t pose, int id) {
 void Pose::print() {
     printf("Translation-\nX: %f\nY: %f\nZ: %f\nTotal Distance: %f\n", _x, _y, _z, _distance);
     printf("Rotation-\nYaw: %f\nPitch: %f\nRoll: %f\n", _yaw, _pitch, _roll);
+
+    printf("atan(x/z) = %f\n", atan2(_x, _z));
 }
 
 void Pose::printIn() {
     printf("Translation-\nX: %f\nY: %f\nZ: %f\nTotal Distance: %f\n", _x * 39.3701, _y * 39.3701, _z * 39.3701, _distance * 39.3701);
-    printf("Rotation-\nYaw: %f\nPitch: %f\nRoll: %f\n", _yaw, _pitch, _roll);
+     printf("atan(x/z) = %f\n", atan2(_x, _z));
+     printf("Rotation-\nYaw: %f\nPitch: %f\nRoll: %f\n", _yaw, _pitch, _roll);
 }

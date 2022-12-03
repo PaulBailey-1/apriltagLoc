@@ -28,10 +28,19 @@ public:
         return _id;
     }
 
+    double getPitch() {
+        return _pitch;
+    }
+
+    double getAngle() {
+	return _angle;
+    }
+
 private:
 
     double _x, _y, _z;
     double _roll, _pitch, _yaw;
+    double _angle;
 
     double _distance;
 

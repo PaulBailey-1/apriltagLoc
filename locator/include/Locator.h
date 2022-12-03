@@ -14,7 +14,7 @@ public:
     void run(std::vector<Pose> poses);
     void print();
 
-    Point getPos() {
+    Point getPos() const {
         return _pos;
     }
 
@@ -26,9 +26,17 @@ public:
         return false;
     }
 
+    void getTagPoses(Pose& t1, Pose& t2) const {
+        t1 = _t1Pose;
+        t2 = _t2Pose;
+    }
+
 private:
 
     std::map<int, Point> _tagPoints;
+
+    Pose _t1Pose;
+    Pose _t2Pose;
 
     Point _pos = {0.0, 0.0};
     bool _newPos;

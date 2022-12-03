@@ -40,26 +40,31 @@ void Locator::print() {
 
 bool Locator::triangulate(std::vector<Pose> poses) {
 
-    Pose t1Pose = poses[0];
-    Pose t2Pose = poses[1];
+    _t1Pose = poses[0];
+    _t2Pose = poses[1];
 
     for (int i = 2; i < poses.size(); i++) {
-        if (poses[i].getDistance() < t1Pose.getDistance()) {
-            t1Pose = poses[i];
-        } else if (poses[i].getDistance() < t2Pose.getDistance()) {
-            t2Pose = poses[i];
+        // if (poses[i].getDistance() < _t1Pose.getDistance()) {
+        //     _t1Pose = poses[i];
+        // } else if (poses[i].getDistance() < _t2Pose.getDistance()) {
+        //     _t2Pose = poses[i];
+        // }
+        if (abs(poses[i].getPitch()) < abs(_t1Pose.getPitch())) {
+            _t1Pose = poses[i];
+        } else if (abs(poses[i].getPitch()) < abs(_t2Pose.getPitch())) {
+            _t2Pose = poses[i];
         }
     }
     
-    double r1 = t1Pose.getDistance();
-    double r2 = t2Pose.getDistance();
+    double r1 = _t1Pose.getDistance();
+    double r2 = _t2Pose.getDistance();
 
     Point pos;
 
     try {
 
-        Point t1 = _tagPoints.at(t1Pose.getId());
-        Point t2 = _tagPoints.at(t2Pose.getId());
+        Point t1 = _tagPoints.at(_t1Pose.getId());
+        Point t2 = _tagPoints.at(_t2Pose.getId());
 
         t1 *= 0.0254;
         t2 *= 0.0254;
@@ -99,7 +104,7 @@ bool Locator::triangulate(std::vector<Pose> poses) {
         return true;
 
     } catch(const std::exception& e) {
-        std::cout << "Triangulation Error: Position not known for tags " << t1Pose.getId() << " " << t2Pose.getId();
+        std::cout << "Triangulation Error: Position not known for tags " << _t1Pose.getId() << " " << _t2Pose.getId();
     }
     return false;
 }

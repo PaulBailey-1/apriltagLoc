@@ -24,6 +24,7 @@ extern "C" {
 #include "Display.h"
 #include "Detector.h"
 #include "Locator.h"
+#include "Pose.h"
 
 int main(int argc, char *argv[]) {
 
@@ -142,15 +143,21 @@ int main(int argc, char *argv[]) {
                 break;
         }
 
-        // if (locator->newPos()) {
-        //     Point pos = locator->getPos();
-        //     ntTable->PutNumber("xPos", pos.x);
-        //     ntTable->PutNumber("yPos", pos.y);
-        // }
-
-        if (logging) {
+        Point pos = locator->getPos();
+        Pose t1, t2;
+        locator->getTagPoses(t1, t2);
+        
+        if (locator->newPos() && abs(t1.getAngle() + t2.getAngle()) < 0.05) {
             Point pos = locator->getPos();
-            log += std::to_string(fps) + ", " + std::to_string(detector->getDetectionsSize()) + ", " + std::to_string(pos.x) + ", " + std::to_string(pos.y) + "\n";
+            ntTable->PutNumber("xPos", pos.x);
+            ntTable->PutNumber("yPos", pos.y);
+        }
+
+        if (logging && locator->newPos() && abs(t1.getAngle() + t2.getAngle()) < 0.05) {
+            log += std::to_string(fps) + ", " + 
+                std::to_string(detector->getDetectionsSize()) + ", " + 
+                std::to_string(pos.x) + ", " + 
+                std::to_string(pos.y) + "\n";
         }
 
         if (display != nullptr) {
