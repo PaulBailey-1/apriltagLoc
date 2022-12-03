@@ -25,7 +25,10 @@ Locator::Locator(float fieldLength, float fieldWidth) {
 
 void Locator::run(std::vector<Pose> poses) {
 
-    if (poses.size() > 1) {
+    if (poses.size() > 0) {
+        if (calculate(poses))
+            _newPos = true;
+    } else if (poses.size() > 1) {
         if (triangulate(poses))
             _newPos = true;
     } else {
@@ -38,24 +41,90 @@ void Locator::print() {
     std::cout << "Position: (" << _pos.x << ", " << _pos.y << ")\n";
 }
 
-bool Locator::triangulate(std::vector<Pose> poses) {
+bool Locator::calculate(std::vector<Pose> poses) {
 
     _t1Pose = poses[0];
-    _t2Pose = poses[1];
-
-    for (int i = 2; i < poses.size(); i++) {
-        // if (poses[i].getDistance() < _t1Pose.getDistance()) {
-        //     _t1Pose = poses[i];
-        // } else if (poses[i].getDistance() < _t2Pose.getDistance()) {
-        //     _t2Pose = poses[i];
-        // }
+    for (int i = 1; i < poses.size(); i++) {
         if (abs(poses[i].getPitch()) < abs(_t1Pose.getPitch())) {
             _t1Pose = poses[i];
-        } else if (abs(poses[i].getPitch()) < abs(_t2Pose.getPitch())) {
-            _t2Pose = poses[i];
         }
     }
+
+    try {
+
+        Point t1 = _tagPoints.at(_t1Pose.getId());
+        t1 *= 0.0254;
+
+        double heading = 22.5 * DEG2RAD;
+        double angle = _t1Pose.getAngle() + heading - PI;
+
+        _pos.x = _t1Pose.getDistance() * cos(angle) + t1.x;
+        _pos.y = _t1Pose.getDistance() * sin(angle) + t1.y;
+
+        _pos *= 39.3701;
+
+        return true;
+        
+    } catch(const std::exception& e) {
+        std::cout << "Locator Error: Position not known for tag " << _t1Pose.getId() << "\n";
+    }
+
+    return false;
+
+}
+
+bool Locator::triangulate(std::vector<Pose> poses) {
+
+
+    // for (int i = 2; i < poses.size(); i++) {
+    //     // if (poses[i].getDistance() < _t1Pose.getDistance()) {
+    //     //     _t1Pose = poses[i];
+    //     // } else if (poses[i].getDistance() < _t2Pose.getDistance()) {
+    //     //     _t2Pose = poses[i];
+    //     // }
+    //     if (abs(poses[i].getPitch()) < abs(_t1Pose.getPitch())) {
+    //         _t1Pose = poses[i];
+    //     } else if (abs(poses[i].getPitch()) < abs(_t2Pose.getPitch())) {
+    //         _t2Pose = poses[i];
+    //     }
+    // }
     
+    bool found = false;
+    for (int i = 0; i < poses.size(); i++) {
+        _t1Pose = poses[i];
+        for (int j = 0; j < poses.size(); j++) {
+
+            if (j == i) {
+                continue;
+            }
+
+            _t2Pose = poses[j];
+
+            if (abs(_t1Pose.getAngle() + _t2Pose.getAngle()) > 0.05) {
+                continue;
+            }
+
+            int code;
+            if (_t1Pose.getId() < _t2Pose.getId()) {
+                code = std::stoi(std::to_string(_t1Pose.getId()) + std::to_string(_t2Pose.getId()));
+            } else {
+                code = std::stoi(std::to_string(_t2Pose.getId()) + std::to_string(_t1Pose.getId()));
+            }
+            if (code == 911 || code == 113 || code == 36 || code == 810 || code == 713 || code == 613) {
+                continue;
+            }
+
+            found = true;
+            break;
+        }
+        if (found)
+            break;
+    }
+
+    if (!found) {
+        return false;
+    }
+   
     double r1 = _t1Pose.getDistance();
     double r2 = _t2Pose.getDistance();
 

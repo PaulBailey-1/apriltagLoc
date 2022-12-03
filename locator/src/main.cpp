@@ -82,6 +82,9 @@ int main(int argc, char *argv[]) {
 
     bool logging = false;
     std::string log = "";
+    bool takeMean = false;
+    int meanCounter;
+    Point meanPos;
 
     nt::NetworkTableInstance serverInst = nt::NetworkTableInstance::Create();
     // serverInst.StartServer("networktables.json", "169.254.4.2");
@@ -138,7 +141,20 @@ int main(int argc, char *argv[]) {
                     std::cout << "Saved log\n";
                 }
                 break;
-            
+            case 'm':
+                if (takeMean) {
+                    takeMean = false;
+                    meanPos /= meanCounter;
+                    std::cout << "Mean Pos - ";
+                    meanPos.print();
+                } else {
+                    meanPos = {0, 0};
+                    meanCounter = 0;
+                    takeMean = true;
+                    std::cout << "Taking mean\n";
+                }
+                
+                break;
             default:
                 break;
         }
@@ -146,18 +162,24 @@ int main(int argc, char *argv[]) {
         Point pos = locator->getPos();
         Pose t1, t2;
         locator->getTagPoses(t1, t2);
-        
-        if (locator->newPos() && abs(t1.getAngle() + t2.getAngle()) < 0.05) {
+
+        if (locator->newPos()) {
+
+            if (takeMean) {
+                meanPos += locator->getPos();;
+                meanCounter++;
+            }
+
             Point pos = locator->getPos();
             ntTable->PutNumber("xPos", pos.x);
             ntTable->PutNumber("yPos", pos.y);
-        }
 
-        if (logging && locator->newPos() && abs(t1.getAngle() + t2.getAngle()) < 0.05) {
-            log += std::to_string(fps) + ", " + 
+            if (logging) {
+                log += std::to_string(fps) + ", " + 
                 std::to_string(detector->getDetectionsSize()) + ", " + 
                 std::to_string(pos.x) + ", " + 
                 std::to_string(pos.y) + "\n";
+            }
         }
 
         if (display != nullptr) {

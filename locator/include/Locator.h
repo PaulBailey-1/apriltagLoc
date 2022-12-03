@@ -18,9 +18,9 @@ public:
         return _pos;
     }
 
-    bool newPos() {
+    bool newPos(bool set = false) {
         if (_newPos) {
-            _newPos = false;
+            _newPos = set;
             return true;
         }
         return false;
@@ -45,5 +45,6 @@ private:
     float _fieldLength;
 
     bool triangulate(std::vector<Pose> poses);
+    bool calculate(std::vector<Pose> poses);
 
 };
