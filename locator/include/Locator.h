@@ -9,7 +9,7 @@
 class Locator {
 public:
 
-    Locator();
+    Locator(float fieldLength, float fieldWidth);
 
     void run(std::vector<Pose> poses);
     void print();
@@ -30,8 +30,11 @@ private:
 
     std::map<int, Point> _tagPoints;
 
-    Point _pos;
+    Point _pos = {0.0, 0.0};
     bool _newPos;
+
+    float _fieldWidth;
+    float _fieldLength;
 
     bool triangulate(std::vector<Pose> poses);
 
