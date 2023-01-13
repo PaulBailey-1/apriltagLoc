@@ -13,7 +13,7 @@ Locator::Locator(float fieldLength, float fieldWidth) {
         {7, {60.0, 151.0}},
         {1, {30.0, 151.0}},
         {13, {0.0, 120.0}},
-        {2, {0.0, 90.0}},
+        {2, {0.0, 0.0}},
         {12, {1.0, 60.0}},
         {11, {1.0, 30.0}}
     };
@@ -28,12 +28,13 @@ void Locator::run(std::vector<Pose> poses) {
     if (poses.size() > 0) {
         if (calculate(poses))
             _newPos = true;
-    } else if (poses.size() > 1) {
-        if (triangulate(poses))
-            _newPos = true;
-    } else {
-        // std::cout << "Sorry!\n";
     }
+    // else if (poses.size() > 1) {
+    //     if (triangulate(poses))
+    //         _newPos = true;
+    // } else {
+    //     // std::cout << "Sorry!\n";
+    // }
 
 }
 
@@ -55,7 +56,7 @@ bool Locator::calculate(std::vector<Pose> poses) {
         Point t1 = _tagPoints.at(_t1Pose.getId());
         t1 *= 0.0254;
 
-        double heading = 22.5 * DEG2RAD;
+        double heading = 0.0 * DEG2RAD;
         double angle = _t1Pose.getAngle() + heading - PI;
 
         _pos.x = _t1Pose.getDistance() * cos(angle) + t1.x;

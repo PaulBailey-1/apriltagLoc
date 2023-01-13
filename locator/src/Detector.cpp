@@ -22,7 +22,7 @@ Detector::Detector(int width, int height, int rotation, Camera camera, double de
         std::cerr << "Couldn't open video capture device" << std::endl;
     }
 
-    _detectionInfo.tagsize = 0.149;
+    _detectionInfo.tagsize = 0.1524;
 
     switch(camera) {
         case PICAMERA:
@@ -53,15 +53,28 @@ Detector::Detector(int width, int height, int rotation, Camera camera, double de
             break;
     }
 
+    if (rotation == 1 || rotation == 3) {
+        double temp = _detectionInfo.fx;
+        _detectionInfo.fx = _detectionInfo.fy;
+        _detectionInfo.fy = temp;
+
+        temp = _detectionInfo.cx;
+        _detectionInfo.cx = _detectionInfo.cy;
+        _detectionInfo.cy = temp;
+
+    }
+
     _tagFamily = tag36h11_create();
     _tagDetector = apriltag_detector_create();
-    apriltag_detector_add_family(_tagDetector, _tagFamily);
+    apriltag_detector_add_family_bits(_tagDetector, _tagFamily, 0);
 
     _tagDetector->quad_decimate = decimate;
     _tagDetector->quad_sigma = blur;
     _tagDetector->nthreads = 4;
     _tagDetector->debug = false;
     _tagDetector->refine_edges = true;
+    std::cout << "LOOKIT  " << _tagDetector->qtp.max_line_fit_mse << "\n";
+    
 
     std::cout << "Detector tag36h11 initialized\n";
     std::cout << width << "x" << height << " Decimation: " << decimate << std::endl;
@@ -98,20 +111,18 @@ void Detector::run() {
     for (int i = 0; i < zarray_size(_detections); i++) {
 
         zarray_get(_detections, i, &_detectionInfo.det);
-        if (_detectionInfo.det->hamming == 0) {
-            apriltag_pose_t apPose;
-            double err = estimate_tag_pose(&_detectionInfo, &apPose);
-            _poses.push_back(Pose(apPose, _detectionInfo.det->id));
-        } else {
-            zarray_remove_index(_detections, i, true);
-        }
+        apriltag_pose_t apPose;
+        double err = estimate_tag_pose(&_detectionInfo, &apPose);
+        _poses.push_back(Pose(apPose, _detectionInfo.det->id));
     }
 }
 
 void Detector::printPoses() {
 
     for (int i = 0; i < _poses.size(); i++) {
-        std::cout << "Tag: " << _poses[i].getId() << "\n";
+        //std::cout << "Tag: " << _poses[i].getId() << "\n";
+        //_poses[i].printIn();
+         std::cout << "Tag: " << _poses[i].getId() << "\n";
         _poses[i].printIn();
     }
 

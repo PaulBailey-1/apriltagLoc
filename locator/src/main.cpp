@@ -17,7 +17,6 @@
 extern "C" {
 #include "apriltag.h"
 #include "apriltag_pose.h"
-#include "tag36h11.h"
 #include "common/getopt.h"
 }
 
@@ -86,17 +85,17 @@ int main(int argc, char *argv[]) {
     int meanCounter;
     Point meanPos;
 
-    nt::NetworkTableInstance serverInst = nt::NetworkTableInstance::Create();
-    // serverInst.StartServer("networktables.json", "169.254.4.2");
-    serverInst.StartServer("networktables.json", "192.168.1.200");
+    // nt::NetworkTableInstance serverInst = nt::NetworkTableInstance::Create();
+    // // serverInst.StartServer("networktables.json", "169.254.4.2");
+    // serverInst.StartServer("networktables.json", "192.168.1.200");
 
-    nt::NetworkTableInstance inst = nt::NetworkTableInstance::GetDefault();
-    std::shared_ptr<nt::NetworkTable> ntTable = inst.GetTable("SmartDashboard");
-    ntTable->PutNumber("xPos", 0.0);
-    ntTable->PutNumber("yPos", 0.0);
-    inst.StartClient3("PI");
-    // inst.SetServer("169.254.4.2", 1735);
-    inst.SetServer("192.168.1.200", 1735);
+    // nt::NetworkTableInstance inst = nt::NetworkTableInstance::GetDefault();
+    // std::shared_ptr<nt::NetworkTable> ntTable = inst.GetTable("SmartDashboard");
+    // ntTable->PutNumber("xPos", 0.0);
+    // ntTable->PutNumber("yPos", 0.0);
+    // inst.StartClient3("PI");
+    // // inst.SetServer("169.254.4.2", 1735);
+    // inst.SetServer("192.168.1.200", 1735);
 
     while (true) {
         timer.start();
@@ -171,8 +170,8 @@ int main(int argc, char *argv[]) {
             }
 
             Point pos = locator->getPos();
-            ntTable->PutNumber("xPos", pos.x);
-            ntTable->PutNumber("yPos", pos.y);
+            // ntTable->PutNumber("xPos", pos.x);
+            // ntTable->PutNumber("yPos", pos.y);
 
             if (logging) {
                 log += std::to_string(fps) + ", " + 
