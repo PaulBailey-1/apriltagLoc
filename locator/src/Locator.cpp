@@ -3,19 +3,7 @@
 Locator::Locator(float fieldLength, float fieldWidth) {
 
     _tagPoints = {
-        {9, {30.0, 1.0}},
-        {10, {60.0, 1.0}},
-        {8, {112.0, 30.0}},
-        {0, {112.0, 60.0}},
-        {4, {112.0, 90.0}},
-        {3, {112.0, 120.0}},
-        {6, {90.0, 151.0}},
-        {7, {60.0, 151.0}},
-        {1, {30.0, 151.0}},
-        {13, {0.0, 120.0}},
         {2, {0.0, 0.0}},
-        {12, {1.0, 60.0}},
-        {11, {1.0, 30.0}}
     };
 
     _fieldLength = fieldLength * 0.0254;
@@ -56,7 +44,7 @@ bool Locator::calculate(std::vector<Pose> poses) {
         Point t1 = _tagPoints.at(_t1Pose.getId());
         t1 *= 0.0254;
 
-        double heading = 0.0 * DEG2RAD;
+        double heading = 0.0 * DEG2RAD; // todo
         double angle = _t1Pose.getAngle() + heading - PI;
 
         _pos.x = _t1Pose.getDistance() * cos(angle) + t1.x;

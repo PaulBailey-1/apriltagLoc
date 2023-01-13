@@ -26,6 +26,10 @@ public:
         return false;
     }
 
+    Pose getTagPose() const {
+        return _t1Pose;
+    }
+
     void getTagPoses(Pose& t1, Pose& t2) const {
         t1 = _t1Pose;
         t2 = _t2Pose;

@@ -85,16 +85,18 @@ int main(int argc, char *argv[]) {
     int meanCounter;
     Point meanPos;
 
-    // nt::NetworkTableInstance serverInst = nt::NetworkTableInstance::Create();
-    // // serverInst.StartServer("networktables.json", "169.254.4.2");
+    nt::NetworkTableInstance serverInst = nt::NetworkTableInstance::Create();
+    serverInst.StartServer("networktables.json", "169.254.4.2");
     // serverInst.StartServer("networktables.json", "192.168.1.200");
 
-    // nt::NetworkTableInstance inst = nt::NetworkTableInstance::GetDefault();
-    // std::shared_ptr<nt::NetworkTable> ntTable = inst.GetTable("SmartDashboard");
-    // ntTable->PutNumber("xPos", 0.0);
-    // ntTable->PutNumber("yPos", 0.0);
-    // inst.StartClient3("PI");
-    // // inst.SetServer("169.254.4.2", 1735);
+    nt::NetworkTableInstance inst = nt::NetworkTableInstance::GetDefault();
+    std::shared_ptr<nt::NetworkTable> ntTable = inst.GetTable("SmartDashboard");
+    ntTable->PutNumber("xPos", 0.0);
+    ntTable->PutNumber("yPos", 0.0);
+    ntTable->PutNumber("angle", 0.0);
+    ntTable->PutNumber("distance", 0.0);
+    inst.StartClient3("PI");
+    inst.SetServer("169.254.4.2", 1735);
     // inst.SetServer("192.168.1.200", 1735);
 
     while (true) {
@@ -158,10 +160,6 @@ int main(int argc, char *argv[]) {
                 break;
         }
 
-        Point pos = locator->getPos();
-        Pose t1, t2;
-        locator->getTagPoses(t1, t2);
-
         if (locator->newPos()) {
 
             if (takeMean) {
@@ -170,8 +168,11 @@ int main(int argc, char *argv[]) {
             }
 
             Point pos = locator->getPos();
-            // ntTable->PutNumber("xPos", pos.x);
-            // ntTable->PutNumber("yPos", pos.y);
+            Pose tag = locator->getTagPose();
+            ntTable->PutNumber("xPos", pos.x);
+            ntTable->PutNumber("yPos", pos.y);
+            ntTable->PutNumber("angle", tag.getAngle());
+            ntTable->PutNumber("distance", tag.getDistance());
 
             if (logging) {
                 log += std::to_string(fps) + ", " + 

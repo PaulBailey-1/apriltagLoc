@@ -64,7 +64,7 @@ Detector::Detector(int width, int height, int rotation, Camera camera, double de
 
     }
 
-    _tagFamily = tag36h11_create();
+    _tagFamily = tag16h5_create();
     _tagDetector = apriltag_detector_create();
     apriltag_detector_add_family_bits(_tagDetector, _tagFamily, 0);
 
@@ -73,16 +73,15 @@ Detector::Detector(int width, int height, int rotation, Camera camera, double de
     _tagDetector->nthreads = 4;
     _tagDetector->debug = false;
     _tagDetector->refine_edges = true;
-    std::cout << "LOOKIT  " << _tagDetector->qtp.max_line_fit_mse << "\n";
-    
+    _tagDetector->qtp.max_line_fit_mse = 1; // Default 10, change if problems
 
-    std::cout << "Detector tag36h11 initialized\n";
+    std::cout << "Detector tag16h5 initialized\n";
     std::cout << width << "x" << height << " Decimation: " << decimate << std::endl;
 }
 
 Detector::~Detector() {
     apriltag_detector_destroy(_tagDetector);
-    tag36h11_destroy(_tagFamily);
+    tag16h5_destroy(_tagFamily);
 }
 
 void Detector::run() {
@@ -111,9 +110,14 @@ void Detector::run() {
     for (int i = 0; i < zarray_size(_detections); i++) {
 
         zarray_get(_detections, i, &_detectionInfo.det);
-        apriltag_pose_t apPose;
-        double err = estimate_tag_pose(&_detectionInfo, &apPose);
-        _poses.push_back(Pose(apPose, _detectionInfo.det->id));
+        if((_detectionInfo.det->c[1] < _img->height / 2 + YFILTER && _detectionInfo.det->c[1] > _img->height / 2 - YFILTER) && 
+            (_detectionInfo.det->id <= 8 && _detectionInfo.det->id >= 1)) {
+            apriltag_pose_t apPose;
+            double err = estimate_tag_pose(&_detectionInfo, &apPose);
+            _poses.push_back(Pose(apPose, _detectionInfo.det->id));
+        } else {
+            zarray_remove_index(_detections, i, false);
+        }
     }
 }
 
