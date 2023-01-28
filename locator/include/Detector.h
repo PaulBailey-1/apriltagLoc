@@ -7,6 +7,7 @@ extern "C" {
 }
 
 #include "opencv2/videoio.hpp"
+#include <librealsense2/rs.hpp>
 #include <vector>
 #include <fstream>
 
@@ -70,5 +71,7 @@ private:
     cv::Mat _frameRaw, _greyFrame, _frame;
 
     std::string _testData;
+
+    rs2::pipeline _pipe;
 
 };

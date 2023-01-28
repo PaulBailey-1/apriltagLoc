@@ -3,7 +3,14 @@
 Locator::Locator(float fieldLength, float fieldWidth) {
 
     _tagPoints = {
+        {1, {0.0, 0.0}},
         {2, {0.0, 0.0}},
+        {3, {0.0, 0.0}},
+        {4, {0.0, 0.0}},
+        {5, {0.0, 0.0}},
+        {6, {0.0, 0.0}},
+        {7, {0.0, 0.0}},
+        {8, {0.0, 0.0}},
     };
 
     _fieldLength = fieldLength * 0.0254;
@@ -11,10 +18,10 @@ Locator::Locator(float fieldLength, float fieldWidth) {
 
 }
 
-void Locator::run(std::vector<Pose> poses) {
+void Locator::run(std::vector<Pose> poses, double heading) {
 
     if (poses.size() > 0) {
-        if (calculate(poses))
+        if (calculate(poses, heading))
             _newPos = true;
     }
     // else if (poses.size() > 1) {
@@ -30,7 +37,7 @@ void Locator::print() {
     std::cout << "Position: (" << _pos.x << ", " << _pos.y << ")\n";
 }
 
-bool Locator::calculate(std::vector<Pose> poses) {
+bool Locator::calculate(std::vector<Pose> poses, double headingRad) {
 
     _t1Pose = poses[0];
     for (int i = 1; i < poses.size(); i++) {
@@ -44,7 +51,7 @@ bool Locator::calculate(std::vector<Pose> poses) {
         Point t1 = _tagPoints.at(_t1Pose.getId());
         t1 *= 0.0254;
 
-        double heading = 0.0 * DEG2RAD; // todo
+        double heading = headingRad * DEG2RAD;
         double angle = _t1Pose.getAngle() + heading - PI;
 
         _pos.x = _t1Pose.getDistance() * cos(angle) + t1.x;

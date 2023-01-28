@@ -11,7 +11,7 @@ public:
 
     Locator(float fieldLength, float fieldWidth);
 
-    void run(std::vector<Pose> poses);
+    void run(std::vector<Pose> poses, double heading);
     void print();
 
     Point getPos() const {
@@ -49,6 +49,6 @@ private:
     float _fieldLength;
 
     bool triangulate(std::vector<Pose> poses);
-    bool calculate(std::vector<Pose> poses);
+    bool calculate(std::vector<Pose> poses, double headingRad);
 
 };

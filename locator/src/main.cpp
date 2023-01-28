@@ -13,6 +13,7 @@
 #include "networktables/NetworkTableInstance.h"
 #include "networktables/NetworkTable.h"
 #include "networktables/NetworkTableEntry.h"
+#include <networktables/DoubleTopic.h>
 
 extern "C" {
 #include "apriltag.h"
@@ -52,7 +53,7 @@ int main(int argc, char *argv[]) {
     int width;
     int height;
 
-    int widthDisplay = 640;
+    int widthDisplay = 848;
     int heightDisplay = 480;
 
     if (getopt_get_int(getopt, "rotate") == 1 || getopt_get_int(getopt, "rotate") == 3) {
@@ -85,18 +86,26 @@ int main(int argc, char *argv[]) {
     int meanCounter;
     Point meanPos;
 
-    nt::NetworkTableInstance serverInst = nt::NetworkTableInstance::Create();
-    serverInst.StartServer("networktables.json", "169.254.4.2");
+    // nt::NetworkTableInstance serverInst = nt::NetworkTableInstance::Create();
+    // serverInst.StartServer("networktables.json", "169.254.4.2");
     // serverInst.StartServer("networktables.json", "192.168.1.200");
 
     nt::NetworkTableInstance inst = nt::NetworkTableInstance::GetDefault();
-    std::shared_ptr<nt::NetworkTable> ntTable = inst.GetTable("SmartDashboard");
-    ntTable->PutNumber("xPos", 0.0);
-    ntTable->PutNumber("yPos", 0.0);
-    ntTable->PutNumber("angle", 0.0);
-    ntTable->PutNumber("distance", 0.0);
-    inst.StartClient3("PI");
-    inst.SetServer("169.254.4.2", 1735);
+    std::shared_ptr<nt::NetworkTable> ntCam = inst.GetTable("ATCamera");
+    ntCam->PutNumber("xPos", 0.0);
+    ntCam->PutNumber("yPos", 0.0);
+    ntCam->PutNumber("z", 0.0);
+    ntCam->PutNumber("x", 0.0);
+    ntCam->PutNumber("angle", 0.0);
+    ntCam->PutNumber("distance", 0.0);
+    ntCam->PutBoolean("valid", false);
+
+    std::shared_ptr<nt::NetworkTable> ntShuf = inst.GetTable("Shuffleboard");
+    auto ntHeading = ntShuf->GetDoubleTopic("Swerve/command/07. imu_heading").Subscribe(0.0, {});
+
+    inst.StartClient3("Pi");
+    inst.SetServer("10.99.18.2", 1735);
+    // inst.SetServer("169.254.4.2", 1735);
     // inst.SetServer("192.168.1.200", 1735);
 
     while (true) {
@@ -104,7 +113,7 @@ int main(int argc, char *argv[]) {
 
         detector->run();
         if (detector->getDetectionsSize() > 0) {
-            locator->run(detector->getPoses());
+            locator->run(detector->getPoses(), ntHeading.Get());
         }
 
         int k = cv::pollKey();
@@ -169,10 +178,13 @@ int main(int argc, char *argv[]) {
 
             Point pos = locator->getPos();
             Pose tag = locator->getTagPose();
-            ntTable->PutNumber("xPos", pos.x);
-            ntTable->PutNumber("yPos", pos.y);
-            ntTable->PutNumber("angle", tag.getAngle());
-            ntTable->PutNumber("distance", tag.getDistance());
+            ntCam->PutNumber("z", tag.getZin());
+            ntCam->PutNumber("x", tag.getXin());
+            ntCam->PutNumber("xPos", pos.x);
+            ntCam->PutNumber("yPos", pos.y);
+            ntCam->PutNumber("angle", tag.getAngle());
+            ntCam->PutNumber("distance", tag.getDistance() * 39.3701);
+            ntCam->PutBoolean("valid", true);
 
             if (logging) {
                 log += std::to_string(fps) + ", " + 

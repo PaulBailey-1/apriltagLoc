@@ -37,6 +37,14 @@ public:
 	return _angle;
     }
 
+    double getZin() {
+        return _z * 39.3701;
+    }
+
+    double getXin() {
+        return _x * 39.3701;
+    }
+
 private:
 
     double _x, _y, _z;

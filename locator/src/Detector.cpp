@@ -17,10 +17,24 @@ Detector::Detector(int width, int height, int rotation, Camera camera, double de
     
     std::cout << "Enabling video capture" << std::endl;
 
-    _cap.open(0);
-    if (!_cap.isOpened()) {
-        std::cerr << "Couldn't open video capture device" << std::endl;
+    std::cin.get();
+
+    try {
+        rs2::config pipeConfig;
+        pipeConfig.enable_stream(RS2_STREAM_DEPTH);
+        pipeConfig.enable_stream(RS2_STREAM_INFRARED);
+        pipeConfig.enable_device("827312071735");
+        bool work = pipeConfig.can_resolve(_pipe);
+        printf("This will work - %i\n", work);
+        _pipe.start(pipeConfig);
+    } catch (const rs2::error & e) {
+        std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
     }
+
+    // _cap.open(0);
+    // if (!_cap.isOpened()) {
+    //     std::cerr << "Couldn't open video capture device" << std::endl;
+    // }
 
     _detectionInfo.tagsize = 0.1524;
 
@@ -86,14 +100,35 @@ Detector::~Detector() {
 
 void Detector::run() {
 
-    if (_rotation != 0) {
-        _cap >> _frameRaw;
-        cv::rotate(_frameRaw, _frame, _rotation - 1);
-    } else {
-        _cap >> _frame;
+    try {
+
+        rs2::frameset data = _pipe.wait_for_frames(); // Wait for next set of frames from the camera
+        // rs2::frame depth = data.get_depth_frame().apply_filter(color_map);
+        rs2::frame color = data.get_infrared_frame();
+
+        // Query frame size (width and height)
+        int w = color.as<rs2::video_frame>().get_width();
+        int h = color.as<rs2::video_frame>().get_height();
+
+        printf("w: %i, h: %i\n", w, h);
+
+        // Create OpenCV matrix of size (w,h) from the colorized depth data
+        _greyFrame = cv::Mat(cv::Size(w, h), CV_8UC3, (void*)color.get_data(), cv::Mat::AUTO_STEP);
+        _frame = _greyFrame;
+        // cv::cvtColor(_frameRaw, _frame, cv::COLOR_BGR2RGB);
+
+    } catch (const rs2::error & e) {
+        std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
     }
 
-    cvtColor(_frame, _greyFrame, cv::COLOR_BGR2GRAY);
+    // if (_rotation != 0) {
+    //     _cap >> _frameRaw;
+    //     cv::rotate(_frameRaw, _frame, _rotation - 1);
+    // } else {
+    //     _cap >> _frame;
+    // }
+
+    // cvtColor(_frame, _greyFrame, cv::COLOR_BGR2GRAY);
 
     _img = new image_u8_t { 
         .width = _greyFrame.cols,
