@@ -21,7 +21,12 @@ public:
     void print();
     void printIn();
 
+    void setSteroDistance(double steroDistance);
+
     double getDistance() {
+        if (_steroDistance != 0.0) {
+            return _steroDistance;
+        }
         return _distance;
     }
 
@@ -45,6 +50,7 @@ public:
         return _x * 39.3701;
     }
 
+
 private:
 
     double _x, _y, _z;
@@ -52,6 +58,7 @@ private:
     double _angle;
 
     double _distance;
+    double _steroDistance;
 
     int _id;
 

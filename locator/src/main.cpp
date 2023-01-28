@@ -28,6 +28,8 @@ extern "C" {
 
 int main(int argc, char *argv[]) {
 
+    std::cin.get();
+
     Display* display = nullptr;
     Detector* detector = nullptr;
     Locator* locator = nullptr;
@@ -37,8 +39,8 @@ int main(int argc, char *argv[]) {
     getopt_add_double(getopt, 'd', "decimate", "4.0", "Decimate input image by this factor");
     getopt_add_double(getopt, 'b', "blur", "0.0", "Apply low-pass blur to input");
     getopt_add_int(getopt, 's', "show", "1", "Show video stream");
-    getopt_add_int(getopt, 'r', "rotate", "2", "Rotates camera feed [0-3]");
-    getopt_add_int(getopt, 'c', "camera", "1", "0 - picamera, 1 - OV9281");
+    getopt_add_int(getopt, 'r', "rotate", "0", "Rotates camera feed [0-3]");
+    getopt_add_int(getopt, 'c', "camera", "2", "0 - picamera, 1 - OV9281, 2 - D435");
 
     if (!getopt_parse(getopt, argc, argv, 1)) {
         printf("Usage: %s [options]\n", argv[0]);
@@ -53,7 +55,7 @@ int main(int argc, char *argv[]) {
     int width;
     int height;
 
-    int widthDisplay = 848;
+    int widthDisplay = 640;
     int heightDisplay = 480;
 
     if (getopt_get_int(getopt, "rotate") == 1 || getopt_get_int(getopt, "rotate") == 3) {

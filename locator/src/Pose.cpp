@@ -15,7 +15,7 @@ Pose::Pose(apriltag_pose_t pose, int id) {
     _z = matd_get(pose.t, 2, 0);
     _angle = atan2(_x, _z);
 
-    _distance = sqrt(pow(_x, 2) + pow(_y, 2) + pow(_z, 2));
+    _distance = sqrt(_x * _x + _z * _z);
 
     double m00 = matd_get(pose.R, 0, 0);
     double m10 = matd_get(pose.R, 1, 0);
@@ -43,6 +43,8 @@ Pose::Pose(apriltag_pose_t pose, int id) {
     _pitch *= RAD2DEG;
     _yaw *= RAD2DEG;
 
+    _steroDistance = 0.0;
+
 }
 
 void Pose::print() {
@@ -56,4 +58,15 @@ void Pose::printIn() {
     printf("Translation-\nX: %f\nY: %f\nZ: %f\nTotal Distance: %f\n", _x * 39.3701, _y * 39.3701, _z * 39.3701, _distance * 39.3701);
      printf("atan(x/z) = %f\n", atan2(_x, _z));
      printf("Rotation-\nYaw: %f\nPitch: %f\nRoll: %f\n", _yaw, _pitch, _roll);
+}
+
+void Pose::setSteroDistance(double steroDistance) {
+    _steroDistance = steroDistance;
+
+    // _angle = atan2(sqrt((_steroDistance * _steroDistance) - (_z * _z)), _z);
+
+    // _x = _steroDistance * sin(_angle);
+    // _z = _steroDistance * cos(_angle);
+
+    printf("x: %f, z: %f, distance: %f\n", _x, _z, _steroDistance);
 }

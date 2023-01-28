@@ -2,9 +2,10 @@
 #include <iostream>
 
 #include "opencv2/imgproc.hpp"
+#include <librealsense2/rs_advanced_mode.hpp>
 
 Detector::Detector(int width, int height, int rotation, Camera camera, double decimate, double blur) : 
-        _frame(), _frameRaw(), _greyFrame(), _cap(), _detectionInfo(), _poses()
+        _frame(), _frameRaw(), _greyFrame(), _cap(), _detectionInfo(), _poses(), _align2IR(RS2_STREAM_INFRARED)
     {
 
     _rotation = rotation;
@@ -17,19 +18,41 @@ Detector::Detector(int width, int height, int rotation, Camera camera, double de
     
     std::cout << "Enabling video capture" << std::endl;
 
-    std::cin.get();
-
     try {
-        rs2::config pipeConfig;
-        pipeConfig.enable_stream(RS2_STREAM_DEPTH);
-        pipeConfig.enable_stream(RS2_STREAM_INFRARED);
-        pipeConfig.enable_device("827312071735");
-        bool work = pipeConfig.can_resolve(_pipe);
-        printf("This will work - %i\n", work);
-        _pipe.start(pipeConfig);
+
+        rs2::context ctx;
+        auto device = ctx.query_devices();
+		auto dev = device[0];
+
+        rs2::config cfg;
+        std::string serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
+        std::string json_file_name = "rsConfig.json";
+
+        std::cout << "Configuring camera : " << serial << std::endl;
+
+        auto advanced_mode_dev = dev.as<rs400::advanced_mode>();
+
+        // Check if advanced-mode is enabled to pass the custom config
+        if (!advanced_mode_dev.is_enabled())
+            {
+                // If not, enable advanced-mode
+                advanced_mode_dev.toggle_advanced_mode(true);
+                std::cout << "Advanced mode enabled. " << std::endl;
+            }
+
+        std::ifstream t(json_file_name);
+        std::string preset_json((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+        advanced_mode_dev.load_json(preset_json);
+        cfg.enable_stream(RS2_STREAM_DEPTH);
+        cfg.enable_stream(RS2_STREAM_INFRARED);
+        cfg.enable_device(serial);
+        _pipe.start(cfg);
+
     } catch (const rs2::error & e) {
         std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
     }
+
+    rs2_intrinsics intrinsics = _pipe.get_active_profile().get_stream(RS2_STREAM_INFRARED).as<rs2::video_stream_profile>().get_intrinsics();
 
     // _cap.open(0);
     // if (!_cap.isOpened()) {
@@ -63,6 +86,18 @@ Detector::Detector(int width, int height, int rotation, Camera camera, double de
             _detectionInfo.cy = 406.9630521749576;
 
             break;
+        case D435:
+
+            width = intrinsics.width;
+            height = intrinsics.height;
+
+            _detectionInfo.fx = intrinsics.fx;
+            _detectionInfo.fy = intrinsics.fy;
+            _detectionInfo.cx = intrinsics.ppx;
+            _detectionInfo.cy = intrinsics.ppy;
+
+            break;
+
         default:
             break;
     }
@@ -96,25 +131,27 @@ Detector::Detector(int width, int height, int rotation, Camera camera, double de
 Detector::~Detector() {
     apriltag_detector_destroy(_tagDetector);
     tag16h5_destroy(_tagFamily);
+    _pipe.stop();
 }
 
 void Detector::run() {
 
+    rs2::frame depthFrame;
+    rs2::frame irFrame;
+
     try {
 
-        rs2::frameset data = _pipe.wait_for_frames(); // Wait for next set of frames from the camera
-        // rs2::frame depth = data.get_depth_frame().apply_filter(color_map);
-        rs2::frame color = data.get_infrared_frame();
+        rs2::frameset data = _pipe.wait_for_frames();
 
-        // Query frame size (width and height)
-        int w = color.as<rs2::video_frame>().get_width();
-        int h = color.as<rs2::video_frame>().get_height();
+        depthFrame = data.get_depth_frame();
+        irFrame = data.get_infrared_frame();
+        data = _align2IR.process(depthFrame);
 
-        printf("w: %i, h: %i\n", w, h);
+        int irWidth = irFrame.as<rs2::video_frame>().get_width();
+        int irHeight = irFrame.as<rs2::video_frame>().get_height();
 
-        // Create OpenCV matrix of size (w,h) from the colorized depth data
-        _greyFrame = cv::Mat(cv::Size(w, h), CV_8UC3, (void*)color.get_data(), cv::Mat::AUTO_STEP);
-        _frame = _greyFrame;
+        _greyFrame = cv::Mat(cv::Size(irWidth, irHeight), CV_8UC1, (void*)irFrame.get_data(), cv::Mat::AUTO_STEP);
+        cv::cvtColor(_greyFrame, _frame, cv::COLOR_GRAY2BGR);
         // cv::cvtColor(_frameRaw, _frame, cv::COLOR_BGR2RGB);
 
     } catch (const rs2::error & e) {
@@ -145,11 +182,19 @@ void Detector::run() {
     for (int i = 0; i < zarray_size(_detections); i++) {
 
         zarray_get(_detections, i, &_detectionInfo.det);
-        if((_detectionInfo.det->c[1] < _img->height / 2 + YFILTER && _detectionInfo.det->c[1] > _img->height / 2 - YFILTER) && 
-            (_detectionInfo.det->id <= 8 && _detectionInfo.det->id >= 1)) {
+        if((_detectionInfo.det->c[1] < _img->height / 2 + YFILTER && _detectionInfo.det->c[1] > _img->height / 2 - YFILTER) 
+            && (_detectionInfo.det->id <= 8 && _detectionInfo.det->id >= 1)) {
+
             apriltag_pose_t apPose;
             double err = estimate_tag_pose(&_detectionInfo, &apPose);
             _poses.push_back(Pose(apPose, _detectionInfo.det->id));
+
+            try {
+                _poses.back().setSteroDistance(depthFrame.as<rs2::depth_frame>().get_distance((int)_detectionInfo.det->c[0], (int)_detectionInfo.det->c[1]));
+            } catch (const rs2::error & e) {
+                std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
+            }
+
         } else {
             zarray_remove_index(_detections, i, false);
         }

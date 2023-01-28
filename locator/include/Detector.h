@@ -18,7 +18,8 @@ public:
 
     enum Camera {
         PICAMERA,
-        OV9281
+        OV9281,
+        D435
     };
 
     Detector(int width, int height, int rotation, Camera camera, double decimate, double blur);
@@ -73,5 +74,6 @@ private:
     std::string _testData;
 
     rs2::pipeline _pipe;
+    rs2::align _align2IR;
 
 };
