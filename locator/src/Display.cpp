@@ -40,7 +40,7 @@ void Display::drawDetections(zarray_t *detections) {
                     cv::Scalar(0xff, 0, 0), 2);
         cv::line(*_frame, cv::Point(det->p[2][0], det->p[2][1]),
                     cv::Point(det->p[3][0], det->p[3][1]),
-                    cv::Scalar(0xff, 0, 0), 2);
+                    cv::Scalar(0, 0, 0xff), 2);
 
         std::stringstream ss;
         ss << det->id;

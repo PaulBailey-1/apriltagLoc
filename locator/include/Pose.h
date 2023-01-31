@@ -16,17 +16,12 @@ class Pose {
 public:
 
     Pose(); 
-    Pose(apriltag_pose_t pose, int id);
+    Pose(apriltag_pose_t pose, int id, double pixelsX, double focalX, double steroDistance);
 
     void print();
     void printIn();
 
-    void setSteroDistance(double steroDistance);
-
     double getDistance() {
-        if (_steroDistance != 0.0) {
-            return _steroDistance;
-        }
         return _distance;
     }
 
@@ -50,6 +45,10 @@ public:
         return _x * 39.3701;
     }
 
+    bool getStero() {
+        return _stero;
+    }
+
 
 private:
 
@@ -58,9 +57,10 @@ private:
     double _angle;
 
     double _distance;
-    double _steroDistance;
 
     int _id;
+
+    bool _stero;
 
 };
 

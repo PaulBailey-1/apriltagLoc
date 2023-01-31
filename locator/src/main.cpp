@@ -41,6 +41,7 @@ int main(int argc, char *argv[]) {
     getopt_add_int(getopt, 's', "show", "1", "Show video stream");
     getopt_add_int(getopt, 'r', "rotate", "0", "Rotates camera feed [0-3]");
     getopt_add_int(getopt, 'c', "camera", "2", "0 - picamera, 1 - OV9281, 2 - D435");
+    getopt_add_int(getopt, 'h', "depthMap", "0", "Show depth map");
 
     if (!getopt_parse(getopt, argc, argv, 1)) {
         printf("Usage: %s [options]\n", argv[0]);
@@ -72,7 +73,7 @@ int main(int argc, char *argv[]) {
         display->setDims(widthDisplay, heightDisplay);
     }
 
-    detector = new Detector(width, height, getopt_get_int(getopt, "rotate"), (Detector::Camera) getopt_get_int(getopt, "camera"), getopt_get_double(getopt, "decimate"), getopt_get_double(getopt, "blur"));
+    detector = new Detector(width, height, getopt_get_int(getopt, "rotate"), (Detector::Camera) getopt_get_int(getopt, "camera"), getopt_get_double(getopt, "decimate"), getopt_get_double(getopt, "blur"), getopt_get_int(getopt, "depthMap"));
 
     locator = new Locator(112, 150);
 
@@ -101,6 +102,7 @@ int main(int argc, char *argv[]) {
     ntCam->PutNumber("angle", 0.0);
     ntCam->PutNumber("distance", 0.0);
     ntCam->PutBoolean("valid", false);
+    ntCam->PutBoolean("stero", false);
 
     std::shared_ptr<nt::NetworkTable> ntShuf = inst.GetTable("Shuffleboard");
     auto ntHeading = ntShuf->GetDoubleTopic("Swerve/command/07. imu_heading").Subscribe(0.0, {});
@@ -187,6 +189,7 @@ int main(int argc, char *argv[]) {
             ntCam->PutNumber("angle", tag.getAngle());
             ntCam->PutNumber("distance", tag.getDistance() * 39.3701);
             ntCam->PutBoolean("valid", true);
+            ntCam->PutBoolean("stero", tag.getStero());
 
             if (logging) {
                 log += std::to_string(fps) + ", " + 

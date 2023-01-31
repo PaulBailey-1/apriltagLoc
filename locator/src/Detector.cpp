@@ -2,10 +2,11 @@
 #include <iostream>
 
 #include "opencv2/imgproc.hpp"
+#include <opencv2/imgcodecs.hpp>
 #include <librealsense2/rs_advanced_mode.hpp>
 
-Detector::Detector(int width, int height, int rotation, Camera camera, double decimate, double blur) : 
-        _frame(), _frameRaw(), _greyFrame(), _cap(), _detectionInfo(), _poses(), _align2IR(RS2_STREAM_INFRARED)
+Detector::Detector(int width, int height, int rotation, Camera camera, double decimate, double blur, int depthMap) : 
+        _frame(), _frameRaw(), _greyFrame(), _cap(), _detectionInfo(), _poses(), _align2Color(RS2_STREAM_COLOR)
     {
 
     _rotation = rotation;
@@ -15,6 +16,8 @@ Detector::Detector(int width, int height, int rotation, Camera camera, double de
     _tagDetector = nullptr;
 
     _testData = "";
+
+    _depthMap = depthMap;
     
     std::cout << "Enabling video capture" << std::endl;
 
@@ -44,7 +47,7 @@ Detector::Detector(int width, int height, int rotation, Camera camera, double de
         std::string preset_json((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
         advanced_mode_dev.load_json(preset_json);
         cfg.enable_stream(RS2_STREAM_DEPTH);
-        cfg.enable_stream(RS2_STREAM_INFRARED);
+        cfg.enable_stream(RS2_STREAM_COLOR);
         cfg.enable_device(serial);
         _pipe.start(cfg);
 
@@ -52,7 +55,7 @@ Detector::Detector(int width, int height, int rotation, Camera camera, double de
         std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
     }
 
-    rs2_intrinsics intrinsics = _pipe.get_active_profile().get_stream(RS2_STREAM_INFRARED).as<rs2::video_stream_profile>().get_intrinsics();
+    rs2_intrinsics intrinsics = _pipe.get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics();
 
     // _cap.open(0);
     // if (!_cap.isOpened()) {
@@ -136,29 +139,34 @@ Detector::~Detector() {
 
 void Detector::run() {
 
-    rs2::frame depthFrame;
-    rs2::frame irFrame;
-
     try {
 
         rs2::frameset data = _pipe.wait_for_frames();
 
-        depthFrame = data.get_depth_frame();
-        irFrame = data.get_infrared_frame();
-        data = _align2IR.process(depthFrame);
+        rs2::depth_frame depthFrame = data.get_depth_frame();
 
-        int irWidth = irFrame.as<rs2::video_frame>().get_width();
-        int irHeight = irFrame.as<rs2::video_frame>().get_height();
+        rs2::frame colorFrame = data.get_color_frame();
+        rs2::frameset processed = _align2Color.process(data);
+        rs2::depth_frame alignedDepthFrame = processed.get_depth_frame();
 
-        _greyFrame = cv::Mat(cv::Size(irWidth, irHeight), CV_8UC1, (void*)irFrame.get_data(), cv::Mat::AUTO_STEP);
-        cv::cvtColor(_greyFrame, _frame, cv::COLOR_GRAY2BGR);
-        // cv::cvtColor(_frameRaw, _frame, cv::COLOR_BGR2RGB);
+        int colorWidth = colorFrame.as<rs2::video_frame>().get_width();
+        int colorHeight = colorFrame.as<rs2::video_frame>().get_height();
 
-    } catch (const rs2::error & e) {
-        std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
-    }
+        // _greyFrame = cv::Mat(cv::Size(irWidth, irHeight), CV_8UC1, (void*)irFrame.get_data(), cv::Mat::AUTO_STEP);
+        _frameRaw = cv::Mat(cv::Size(colorWidth, colorHeight), CV_8UC3, (void*) colorFrame.get_data(), cv::Mat::AUTO_STEP);
+        cv::cvtColor(_frameRaw, _greyFrame, cv::COLOR_BGR2GRAY);
 
-    // if (_rotation != 0) {
+        rs2::frame depthFrameColor;
+        if (_depthMap) {
+            depthFrameColor = rs2::frame(depthFrame);
+            depthFrameColor.apply_filter(_colorMap);
+            _frame = cv::Mat(cv::Size(depthFrameColor.as<rs2::video_frame>().get_width(), depthFrameColor.as<rs2::video_frame>().get_height()), CV_8UC3, (void*)depthFrameColor.get_data(), cv::Mat::AUTO_STEP);
+        } else {
+            // cv::cvtColor(_greyFrame, _frame, cv::COLOR_GRAY2BGR);
+            cv::cvtColor(_frameRaw, _frame, cv::COLOR_RGB2BGR);
+        }
+
+            // if (_rotation != 0) {
     //     _cap >> _frameRaw;
     //     cv::rotate(_frameRaw, _frame, _rotation - 1);
     // } else {
@@ -187,17 +195,27 @@ void Detector::run() {
 
             apriltag_pose_t apPose;
             double err = estimate_tag_pose(&_detectionInfo, &apPose);
-            _poses.push_back(Pose(apPose, _detectionInfo.det->id));
 
+            double steroDistance = 0.0;
             try {
-                _poses.back().setSteroDistance(depthFrame.as<rs2::depth_frame>().get_distance((int)_detectionInfo.det->c[0], (int)_detectionInfo.det->c[1]));
+                steroDistance = alignedDepthFrame.get_distance((int)_detectionInfo.det->c[0], (int)_detectionInfo.det->c[1]);
             } catch (const rs2::error & e) {
                 std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
             }
 
+            double pixelsX = _detectionInfo.det->c[0] - (_img->width / 2);
+            _poses.push_back(Pose(apPose, _detectionInfo.det->id, pixelsX, _detectionInfo.fx, steroDistance));
+
+            // double oldAngle = atan2(matd_get(apPose.t, 0, 0), matd_get(apPose.t, 2, 0));
+            // printf("angleOld: %f, angleNew: %f\n", oldAngle, angle);
+
         } else {
             zarray_remove_index(_detections, i, false);
         }
+    }
+
+    } catch (const rs2::error & e) {
+        std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
     }
 }
 
@@ -233,8 +251,8 @@ void Detector::runTest() {
             zarray_get(_detections, 0, &_detectionInfo.det);
             apriltag_pose_t apPose;
             double err = estimate_tag_pose(&_detectionInfo, &apPose);
-            Pose pose(apPose, _detectionInfo.det->id);
-            measured = pose.getDistance();
+            // Pose pose(apPose, _detectionInfo.det->id, 0.0);
+            // measured = pose.getDistance();
 
             double error = abs(actual - measured) * 100;
             _testData += std::to_string(error) + ", ";

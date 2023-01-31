@@ -22,7 +22,7 @@ public:
         D435
     };
 
-    Detector(int width, int height, int rotation, Camera camera, double decimate, double blur);
+    Detector(int width, int height, int rotation, Camera camera, double decimate, double blur, int depthMap);
     ~Detector();
 
     void run();
@@ -74,6 +74,9 @@ private:
     std::string _testData;
 
     rs2::pipeline _pipe;
-    rs2::align _align2IR;
+    rs2::align _align2Color;
+    rs2::colorizer _colorMap;
+
+    bool _depthMap;
 
 };
