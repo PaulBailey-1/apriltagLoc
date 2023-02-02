@@ -49,13 +49,23 @@ Detector::Detector(int width, int height, int rotation, Camera camera, double de
         cfg.enable_stream(RS2_STREAM_DEPTH);
         cfg.enable_stream(RS2_STREAM_COLOR);
         cfg.enable_device(serial);
-        _pipe.start(cfg);
+        rs2::pipeline_profile pipeProfile = _pipe.start(cfg);
+
+        rs2::depth_sensor depth_sensor = pipeProfile.get_device().first<rs2::depth_sensor>();
+        _depthScale = depth_sensor.get_depth_scale();
 
     } catch (const rs2::error & e) {
         std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
     }
 
-    rs2_intrinsics intrinsics = _pipe.get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>().get_intrinsics();
+    rs2::video_stream_profile colorProfile = _pipe.get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>();
+    rs2::video_stream_profile depthProfile = _pipe.get_active_profile().get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>();
+
+    _colorIntrinsics = colorProfile.get_intrinsics();
+    _colorExtrinsics = colorProfile.get_extrinsics_to(depthProfile);
+    
+    _depthIntrinsics = depthProfile.get_intrinsics();
+    _depthExtrinsics = depthProfile.get_extrinsics_to(colorProfile);
 
     // _cap.open(0);
     // if (!_cap.isOpened()) {
@@ -91,13 +101,13 @@ Detector::Detector(int width, int height, int rotation, Camera camera, double de
             break;
         case D435:
 
-            width = intrinsics.width;
-            height = intrinsics.height;
+            width = _depthIntrinsics.width;
+            height = _depthIntrinsics.height;
 
-            _detectionInfo.fx = intrinsics.fx;
-            _detectionInfo.fy = intrinsics.fy;
-            _detectionInfo.cx = intrinsics.ppx;
-            _detectionInfo.cy = intrinsics.ppy;
+            _detectionInfo.fx = _depthIntrinsics.fx;
+            _detectionInfo.fy = _depthIntrinsics.fy;
+            _detectionInfo.cx = _depthIntrinsics.ppx;
+            _detectionInfo.cy = _depthIntrinsics.ppy;
 
             break;
 
@@ -144,10 +154,9 @@ void Detector::run() {
         rs2::frameset data = _pipe.wait_for_frames();
 
         rs2::depth_frame depthFrame = data.get_depth_frame();
-
         rs2::frame colorFrame = data.get_color_frame();
-        rs2::frameset processed = _align2Color.process(data);
-        rs2::depth_frame alignedDepthFrame = processed.get_depth_frame();
+        // rs2::frameset processed = _align2Color.process(data);
+        // rs2::depth_frame alignedDepthFrame = processed.get_depth_frame();
 
         int colorWidth = colorFrame.as<rs2::video_frame>().get_width();
         int colorHeight = colorFrame.as<rs2::video_frame>().get_height();
@@ -198,7 +207,32 @@ void Detector::run() {
 
             double steroDistance = 0.0;
             try {
-                steroDistance = alignedDepthFrame.get_distance((int)_detectionInfo.det->c[0], (int)_detectionInfo.det->c[1]);
+                // void rs2_project_color_pixel_to_depth_pixel(float to_pixel[2],
+                    // const uint16_t* data, float depth_scale,
+                    // float depth_min, float depth_max,
+                    // const struct rs2_intrinsics* depth_intrin,
+                    // const struct rs2_intrinsics* color_intrin,
+                    // const struct rs2_extrinsics* color_to_depth,
+                    // const struct rs2_extrinsics* depth_to_color,
+                    // const float from_pixel[2]);
+
+                float colorTagCenter[2];
+                float depthTagCenter[2];
+
+                colorTagCenter[0] = (int)_detectionInfo.det->c[0];
+                colorTagCenter[1] = (int)_detectionInfo.det->c[1];
+
+                rs2_project_color_pixel_to_depth_pixel(
+                    depthTagCenter,
+                    reinterpret_cast<const uint16_t*>(data.get_data()),
+                    _depthScale,
+                    0.0f, 6.0f,
+                    &_depthIntrinsics, &_colorIntrinsics,
+                    &_colorExtrinsics, &_depthExtrinsics,
+                    colorTagCenter
+                );
+
+                steroDistance = depthFrame.get_distance(depthTagCenter[0], depthTagCenter[1]);
             } catch (const rs2::error & e) {
                 std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
             }

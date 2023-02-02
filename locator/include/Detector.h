@@ -77,6 +77,14 @@ private:
     rs2::align _align2Color;
     rs2::colorizer _colorMap;
 
+    rs2_intrinsics _colorIntrinsics;
+    rs2_extrinsics _colorExtrinsics;
+
+    rs2_intrinsics _depthIntrinsics;
+    rs2_extrinsics _depthExtrinsics;
+
+    float _depthScale;
+
     bool _depthMap;
 
 };
