@@ -127,6 +127,12 @@ int main(int argc, char *argv[]) {
             locator->run(detector->getPoses(), 0.0);
         }
 
+        if (ntCam->GetBoolean("feedback", false)) {
+            detector->setYCrop(0);
+        } else {
+            detector->setYCrop();
+        }
+
         int k = cv::pollKey();
         
         if (k == 27) { // esc
