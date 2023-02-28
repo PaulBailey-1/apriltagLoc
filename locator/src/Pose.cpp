@@ -12,12 +12,12 @@ Pose::Pose(apriltag_pose_t pose, int id, double pixelsX, double focalX, double s
 
     if (steroDistance != 0.0) {
         _x = (pixelsX / focalX) * steroDistance;
-        _z = sqrt((steroDistance * steroDistance) - (_x * _x));
+        _z = steroDistance;
         _y = 0.0;
-        _distance = steroDistance;
+        _distance = sqrt((_x * _x) + (_z * _z));
         _stero = true;
 
-        printf("x: %f, z: %f, distance: %f\n", _x, _z, _distance);
+        // printf("x: %f, z: %f, distance: %f\n", _x, _z, _distance);
 
     } else {
         _x = matd_get(pose.t, 0, 0);
@@ -29,7 +29,7 @@ Pose::Pose(apriltag_pose_t pose, int id, double pixelsX, double focalX, double s
 
     }
     
-    _angle = 0.0;
+    _angle = -atan2(_x, _z);
 
     // double m00 = matd_get(pose.R, 0, 0);
     // double m10 = matd_get(pose.R, 1, 0);

@@ -25,23 +25,24 @@ extern "C" {
 #include "Detector.h"
 #include "Locator.h"
 #include "Pose.h"
+#include "Stream.h"
 
 int main(int argc, char *argv[]) {
-
-    std::cin.get();
 
     Display* display = nullptr;
     Detector* detector = nullptr;
     Locator* locator = nullptr;
+    Stream* stream = nullptr;
 
     getopt_t* getopt = getopt_create();
 
-    getopt_add_double(getopt, 'd', "decimate", "4.0", "Decimate input image by this factor");
+    getopt_add_double(getopt, 'd', "decimate", "1.0", "Decimate input image by this factor");
     getopt_add_double(getopt, 'b', "blur", "0.0", "Apply low-pass blur to input");
     getopt_add_int(getopt, 's', "show", "1", "Show video stream");
     getopt_add_int(getopt, 'r', "rotate", "0", "Rotates camera feed [0-3]");
     getopt_add_int(getopt, 'c', "camera", "2", "0 - picamera, 1 - OV9281, 2 - D435");
     getopt_add_int(getopt, 'h', "depthMap", "0", "Show depth map");
+    getopt_add_int(getopt, 'o', "stream", "1", "Stream to virtual camera");
 
     if (!getopt_parse(getopt, argc, argv, 1)) {
         printf("Usage: %s [options]\n", argv[0]);
@@ -51,6 +52,10 @@ int main(int argc, char *argv[]) {
 
     if (getopt_get_int(getopt, "show") == 1) {
         display = new Display();
+    }
+
+    if (getopt_get_int(getopt, "stream") == 1) {
+        stream = new Stream();
     }
 
     int width;
@@ -89,6 +94,8 @@ int main(int argc, char *argv[]) {
     int meanCounter;
     Point meanPos;
 
+    int heartbeat = 0;
+
     // nt::NetworkTableInstance serverInst = nt::NetworkTableInstance::Create();
     // serverInst.StartServer("networktables.json", "169.254.4.2");
     // serverInst.StartServer("networktables.json", "192.168.1.200");
@@ -103,9 +110,9 @@ int main(int argc, char *argv[]) {
     ntCam->PutNumber("distance", 0.0);
     ntCam->PutBoolean("valid", false);
     ntCam->PutBoolean("stero", false);
+    ntCam->PutNumber("id", 0);
+    ntCam->PutNumber("heartbeat", 0);
 
-    std::shared_ptr<nt::NetworkTable> ntShuf = inst.GetTable("Shuffleboard");
-    auto ntHeading = ntShuf->GetDoubleTopic("Swerve/command/07. imu_heading").Subscribe(0.0, {});
 
     inst.StartClient3("Pi");
     inst.SetServer("10.99.18.2", 1735);
@@ -117,7 +124,7 @@ int main(int argc, char *argv[]) {
 
         detector->run();
         if (detector->getDetectionsSize() > 0) {
-            locator->run(detector->getPoses(), ntHeading.Get());
+            locator->run(detector->getPoses(), 0.0);
         }
 
         int k = cv::pollKey();
@@ -190,6 +197,11 @@ int main(int argc, char *argv[]) {
             ntCam->PutNumber("distance", tag.getDistance() * 39.3701);
             ntCam->PutBoolean("valid", true);
             ntCam->PutBoolean("stero", tag.getStero());
+	        ntCam->PutNumber("id", tag.getId());
+	        ntCam->PutNumber("heartbeat", heartbeat);
+            inst.Flush();
+
+	        heartbeat++;
 
             if (logging) {
                 log += std::to_string(fps) + ", " + 
@@ -204,6 +216,10 @@ int main(int argc, char *argv[]) {
             display->drawDetections(detector->getDetections());
         }
 
+        if (stream != nullptr) {
+            stream->writeFrame(detector->getFrame());
+        }
+
         detector->destroyDetections();
 
         timer.stop();
@@ -212,7 +228,7 @@ int main(int argc, char *argv[]) {
         every++;
         if (every == fpsDisplay) {
             fps = fpsDisplay / sum;
-            display->setFps(fps);
+            if (display != nullptr) {display->setFps(fps);}
             every = 0;
             sum = 0.0;
         }

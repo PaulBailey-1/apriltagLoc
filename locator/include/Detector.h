@@ -55,7 +55,9 @@ public:
 
 private:
 
-    const int YFILTER = 200;
+    void init();
+
+    const int YFILTER = 150;
 
     zarray_t* _detections;
     std::vector<Pose> _poses;

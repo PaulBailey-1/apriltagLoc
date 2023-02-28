@@ -6,7 +6,7 @@
 #include <librealsense2/rs_advanced_mode.hpp>
 
 Detector::Detector(int width, int height, int rotation, Camera camera, double decimate, double blur, int depthMap) : 
-        _frame(), _frameRaw(), _greyFrame(), _cap(), _detectionInfo(), _poses(), _align2Color(RS2_STREAM_COLOR)
+        _frame(), _frameRaw(), _greyFrame(), _cap(), _detectionInfo(), _poses(), _align2Color(RS2_STREAM_INFRARED)
     {
 
     _rotation = rotation;
@@ -22,43 +22,13 @@ Detector::Detector(int width, int height, int rotation, Camera camera, double de
     std::cout << "Enabling video capture" << std::endl;
 
     try {
-
-        rs2::context ctx;
-        auto device = ctx.query_devices();
-		auto dev = device[0];
-
-        rs2::config cfg;
-        std::string serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
-        std::string json_file_name = "rsConfig.json";
-
-        std::cout << "Configuring camera : " << serial << std::endl;
-
-        auto advanced_mode_dev = dev.as<rs400::advanced_mode>();
-
-        // Check if advanced-mode is enabled to pass the custom config
-        if (!advanced_mode_dev.is_enabled())
-            {
-                // If not, enable advanced-mode
-                advanced_mode_dev.toggle_advanced_mode(true);
-                std::cout << "Advanced mode enabled. " << std::endl;
-            }
-
-        std::ifstream t(json_file_name);
-        std::string preset_json((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
-        advanced_mode_dev.load_json(preset_json);
-        cfg.enable_stream(RS2_STREAM_DEPTH);
-        cfg.enable_stream(RS2_STREAM_COLOR);
-        cfg.enable_device(serial);
-        rs2::pipeline_profile pipeProfile = _pipe.start(cfg);
-
-        rs2::depth_sensor depth_sensor = pipeProfile.get_device().first<rs2::depth_sensor>();
-        _depthScale = depth_sensor.get_depth_scale();
-
+        init();
     } catch (const rs2::error & e) {
         std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
+        init();
     }
 
-    rs2::video_stream_profile colorProfile = _pipe.get_active_profile().get_stream(RS2_STREAM_COLOR).as<rs2::video_stream_profile>();
+    rs2::video_stream_profile colorProfile = _pipe.get_active_profile().get_stream(RS2_STREAM_INFRARED).as<rs2::video_stream_profile>();
     rs2::video_stream_profile depthProfile = _pipe.get_active_profile().get_stream(RS2_STREAM_DEPTH).as<rs2::video_stream_profile>();
 
     _colorIntrinsics = colorProfile.get_intrinsics();
@@ -104,10 +74,10 @@ Detector::Detector(int width, int height, int rotation, Camera camera, double de
             width = _depthIntrinsics.width;
             height = _depthIntrinsics.height;
 
-            _detectionInfo.fx = _depthIntrinsics.fx;
-            _detectionInfo.fy = _depthIntrinsics.fy;
-            _detectionInfo.cx = _depthIntrinsics.ppx;
-            _detectionInfo.cy = _depthIntrinsics.ppy;
+            _detectionInfo.fx = _colorIntrinsics.fx;
+            _detectionInfo.fy = _colorIntrinsics.fy;
+            _detectionInfo.cx = _colorIntrinsics.ppx;
+            _detectionInfo.cy = _colorIntrinsics.ppy;
 
             break;
 
@@ -147,6 +117,39 @@ Detector::~Detector() {
     _pipe.stop();
 }
 
+void Detector::init() {
+    rs2::context ctx;
+    rs2::device_list devices = ctx.query_devices();
+    rs2::device dev = devices[0];
+
+    rs2::config cfg;
+    std::string serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
+    std::string json_file_name = "rsConfig.json";
+
+    std::cout << "Configuring camera : " << serial << std::endl;
+
+    auto advanced_mode_dev = dev.as<rs400::advanced_mode>();
+
+    // Check if advanced-mode is enabled to pass the custom config
+    if (!advanced_mode_dev.is_enabled())
+        {
+            // If not, enable advanced-mode
+            advanced_mode_dev.toggle_advanced_mode(true);
+            std::cout << "Advanced mode enabled. " << std::endl;
+        }
+
+    std::ifstream t(json_file_name);
+    std::string preset_json((std::istreambuf_iterator<char>(t)), std::istreambuf_iterator<char>());
+    advanced_mode_dev.load_json(preset_json);
+    cfg.enable_stream(RS2_STREAM_DEPTH);
+    cfg.enable_stream(RS2_STREAM_INFRARED, 2);
+    cfg.enable_device(serial);
+    rs2::pipeline_profile pipeProfile = _pipe.start(cfg);
+
+    rs2::depth_sensor depth_sensor = pipeProfile.get_device().first<rs2::depth_sensor>();
+    _depthScale = depth_sensor.get_depth_scale();
+}
+
 void Detector::run() {
 
     try {
@@ -154,7 +157,7 @@ void Detector::run() {
         rs2::frameset data = _pipe.wait_for_frames();
 
         rs2::depth_frame depthFrame = data.get_depth_frame();
-        rs2::frame colorFrame = data.get_color_frame();
+        rs2::frame colorFrame = data.get_infrared_frame();
         // rs2::frameset processed = _align2Color.process(data);
         // rs2::depth_frame alignedDepthFrame = processed.get_depth_frame();
 
@@ -162,18 +165,26 @@ void Detector::run() {
         int colorHeight = colorFrame.as<rs2::video_frame>().get_height();
 
         // _greyFrame = cv::Mat(cv::Size(irWidth, irHeight), CV_8UC1, (void*)irFrame.get_data(), cv::Mat::AUTO_STEP);
-        _frameRaw = cv::Mat(cv::Size(colorWidth, colorHeight), CV_8UC3, (void*) colorFrame.get_data(), cv::Mat::AUTO_STEP);
-        cv::cvtColor(_frameRaw, _greyFrame, cv::COLOR_BGR2GRAY);
+        _frameRaw = cv::Mat(cv::Size(colorWidth, colorHeight), CV_8UC1, (void*) colorFrame.get_data(), cv::Mat::AUTO_STEP);
+        // cv::cvtColor(_frameRaw, _greyFrame, cv::COLOR_BGR2GRAY);
+        // cv::cvtColor(_frameRaw, _greyFrame, cv::COLOR_BGR2GRAY);
+        _greyFrame = cv::Mat(_frameRaw, cv::Rect(0, YFILTER, colorWidth, colorHeight - (YFILTER * 2)));
 
-        rs2::frame depthFrameColor;
-        if (_depthMap) {
-            depthFrameColor = rs2::frame(depthFrame);
-            depthFrameColor.apply_filter(_colorMap);
-            _frame = cv::Mat(cv::Size(depthFrameColor.as<rs2::video_frame>().get_width(), depthFrameColor.as<rs2::video_frame>().get_height()), CV_8UC3, (void*)depthFrameColor.get_data(), cv::Mat::AUTO_STEP);
-        } else {
+        // rs2::frame depthFrameColor;
+        // if (_depthMap) {
+        //     depthFrameColor = rs2::frame(depthFrame);
+        //     depthFrameColor.apply_filter(_colorMap);
+        //     _frame = cv::Mat(cv::Size(depthFrameColor.as<rs2::video_frame>().get_width(), depthFrameColor.as<rs2::video_frame>().get_height()), CV_8UC3, (void*)depthFrameColor.get_data(), cv::Mat::AUTO_STEP);
+        // } else {
+        cv::Mat frameMono = cv::Mat(cv::Size(colorWidth, colorHeight), CV_8UC1);
+        _frameRaw(cv::Rect(0, YFILTER, colorWidth, colorHeight - (YFILTER * 2))).copyTo(frameMono(cv::Rect(0, YFILTER, colorWidth, colorHeight - (YFILTER * 2))));
+        cv::cvtColor(frameMono, _frame, cv::COLOR_GRAY2BGR);
+        
+            // _frame = cv::Mat(_frameRaw, cv::Rect(0, YFILTER, colorWidth, colorHeight - (YFILTER * 2)));
+
             // cv::cvtColor(_greyFrame, _frame, cv::COLOR_GRAY2BGR);
-            cv::cvtColor(_frameRaw, _frame, cv::COLOR_RGB2BGR);
-        }
+            // cv::cvtColor(_frameRaw, _frame, cv::COLOR_RGB2BGR);
+        // }
 
             // if (_rotation != 0) {
     //     _cap >> _frameRaw;
@@ -191,30 +202,30 @@ void Detector::run() {
         .buf = _greyFrame.data
     };
 
-    _detections = apriltag_detector_detect(_tagDetector, _img);
-    // _detections = zarray_create(1);
+    if (_img->width > 0) {
+        _detections = apriltag_detector_detect(_tagDetector, _img);
+    } else {
+        _detections = zarray_create(1);
+    }
 
     _poses.clear();
 
     for (int i = 0; i < zarray_size(_detections); i++) {
 
         zarray_get(_detections, i, &_detectionInfo.det);
-        if((_detectionInfo.det->c[1] < _img->height / 2 + YFILTER && _detectionInfo.det->c[1] > _img->height / 2 - YFILTER) 
-            && (_detectionInfo.det->id <= 8 && _detectionInfo.det->id >= 1)) {
+        _detectionInfo.det->c[1] = _detectionInfo.det->c[1] + YFILTER;
+        for (int j = 0; j < 4; j++) {
+            _detectionInfo.det->p[j][1] = _detectionInfo.det->p[j][1] + YFILTER;
+        }
+        zarray_set(_detections, i, &_detectionInfo.det, NULL);
+
+        if(_detectionInfo.det->id <= 8 && _detectionInfo.det->id >= 1) {
 
             apriltag_pose_t apPose;
             double err = estimate_tag_pose(&_detectionInfo, &apPose);
 
             double steroDistance = 0.0;
             try {
-                // void rs2_project_color_pixel_to_depth_pixel(float to_pixel[2],
-                    // const uint16_t* data, float depth_scale,
-                    // float depth_min, float depth_max,
-                    // const struct rs2_intrinsics* depth_intrin,
-                    // const struct rs2_intrinsics* color_intrin,
-                    // const struct rs2_extrinsics* color_to_depth,
-                    // const struct rs2_extrinsics* depth_to_color,
-                    // const float from_pixel[2]);
 
                 float colorTagCenter[2];
                 float depthTagCenter[2];
@@ -222,15 +233,8 @@ void Detector::run() {
                 colorTagCenter[0] = (int)_detectionInfo.det->c[0];
                 colorTagCenter[1] = (int)_detectionInfo.det->c[1];
 
-                rs2_project_color_pixel_to_depth_pixel(
-                    depthTagCenter,
-                    reinterpret_cast<const uint16_t*>(data.get_data()),
-                    _depthScale,
-                    0.0f, 6.0f,
-                    &_depthIntrinsics, &_colorIntrinsics,
-                    &_colorExtrinsics, &_depthExtrinsics,
-                    colorTagCenter
-                );
+                depthTagCenter[0] = colorTagCenter[0];
+                depthTagCenter[1] = colorTagCenter[1];
 
                 steroDistance = depthFrame.get_distance(depthTagCenter[0], depthTagCenter[1]);
             } catch (const rs2::error & e) {
@@ -239,9 +243,6 @@ void Detector::run() {
 
             double pixelsX = _detectionInfo.det->c[0] - (_img->width / 2);
             _poses.push_back(Pose(apPose, _detectionInfo.det->id, pixelsX, _detectionInfo.fx, steroDistance));
-
-            // double oldAngle = atan2(matd_get(apPose.t, 0, 0), matd_get(apPose.t, 2, 0));
-            // printf("angleOld: %f, angleNew: %f\n", oldAngle, angle);
 
         } else {
             zarray_remove_index(_detections, i, false);

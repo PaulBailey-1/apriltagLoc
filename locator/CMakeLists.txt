@@ -10,6 +10,7 @@ set(sources
     "src/Display.cpp"
     "src/Detector.cpp"
     "src/Locator.cpp"
+    "src/Stream.cpp"
 )
 
 include_directories("include/")
@@ -17,8 +18,8 @@ include_directories("include/")
 find_package( OpenCV REQUIRED )
 include_directories( ${OpenCV_INCLUDE_DIRS} )
 find_package( apriltag REQUIRED )
-find_package( wpinet REQUIRED )
-find_package( ntcore REQUIRED )
+# find_package( wpiutil REQUIRED )
+# find_package( ntcore REQUIRED )
 find_package(realsense2 REQUIRED)
 include_directories("/usr/local/include/ntcore")
 include_directories("/usr/local/include/wpiutil")
@@ -26,4 +27,4 @@ include_directories("/usr/local/include/wpiutil")
 add_executable( locator ${sources} )
 
 target_compile_features( locator PUBLIC cxx_std_20)
-target_link_libraries( locator apriltag ntcore ${OpenCV_LIBS} ${realsense2_LIBRARY})
+target_link_libraries( locator apriltag /usr/local/lib/libntcore.so ${OpenCV_LIBS} ${realsense2_LIBRARY})

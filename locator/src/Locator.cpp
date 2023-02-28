@@ -41,31 +41,31 @@ bool Locator::calculate(std::vector<Pose> poses, double headingRad) {
 
     _t1Pose = poses[0];
     for (int i = 1; i < poses.size(); i++) {
-        if (abs(poses[i].getPitch()) < abs(_t1Pose.getPitch())) {
+        if (abs(poses[i].getDistance()) < abs(_t1Pose.getDistance())) {
             _t1Pose = poses[i];
         }
     }
 
-    try {
+    // try {
 
-        Point t1 = _tagPoints.at(_t1Pose.getId());
-        t1 *= 0.0254;
+    //     Point t1 = _tagPoints.at(_t1Pose.getId());
+    //     t1 *= 0.0254;
 
-        double heading = headingRad * DEG2RAD;
-        double angle = _t1Pose.getAngle() + heading - PI;
+    //     double heading = headingRad * DEG2RAD;
+    //     double angle = _t1Pose.getAngle() + heading - PI;
 
-        _pos.x = _t1Pose.getDistance() * cos(angle) + t1.x;
-        _pos.y = _t1Pose.getDistance() * sin(angle) + t1.y;
+    //     _pos.x = _t1Pose.getDistance() * cos(angle) + t1.x;
+    //     _pos.y = _t1Pose.getDistance() * sin(angle) + t1.y;
 
-        _pos *= 39.3701;
+    //     _pos *= 39.3701;
 
-        return true;
+    //     return true;
         
-    } catch(const std::exception& e) {
-        std::cout << "Locator Error: Position not known for tag " << _t1Pose.getId() << "\n";
-    }
+    // } catch(const std::exception& e) {
+    //     std::cout << "Locator Error: Position not known for tag " << _t1Pose.getId() << "\n";
+    // }
 
-    return false;
+    return true;
 
 }
 
