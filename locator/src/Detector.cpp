@@ -157,18 +157,18 @@ void Detector::run() {
         rs2::frameset data = _pipe.wait_for_frames();
 
         rs2::depth_frame depthFrame = data.get_depth_frame();
-        rs2::frame colorFrame = data.get_infrared_frame();
-        // rs2::frameset processed = _align2Color.process(data);
+        rs2::frame irFrame = data.get_infrared_frame();
+        // rs2::frameset processed = _align2ir.process(data);
         // rs2::depth_frame alignedDepthFrame = processed.get_depth_frame();
 
-        int colorWidth = colorFrame.as<rs2::video_frame>().get_width();
-        int colorHeight = colorFrame.as<rs2::video_frame>().get_height();
+        int irWidth = irFrame.as<rs2::video_frame>().get_width();
+        int irHeight = irFrame.as<rs2::video_frame>().get_height();
 
         // _greyFrame = cv::Mat(cv::Size(irWidth, irHeight), CV_8UC1, (void*)irFrame.get_data(), cv::Mat::AUTO_STEP);
-        _frameRaw = cv::Mat(cv::Size(colorWidth, colorHeight), CV_8UC1, (void*) colorFrame.get_data(), cv::Mat::AUTO_STEP);
+        _frameRaw = cv::Mat(cv::Size(irWidth, irHeight), CV_8UC1, (void*) irFrame.get_data(), cv::Mat::AUTO_STEP);
         // cv::cvtColor(_frameRaw, _greyFrame, cv::COLOR_BGR2GRAY);
         // cv::cvtColor(_frameRaw, _greyFrame, cv::COLOR_BGR2GRAY);
-        _greyFrame = cv::Mat(_frameRaw, cv::Rect(0, YFILTER, colorWidth, colorHeight - (YFILTER * 2)));
+        _greyFrame = cv::Mat(_frameRaw, cv::Rect(0, _yCrop, irWidth, irHeight - (_yCrop * 2)));
 
         // rs2::frame depthFrameColor;
         // if (_depthMap) {
@@ -176,8 +176,8 @@ void Detector::run() {
         //     depthFrameColor.apply_filter(_colorMap);
         //     _frame = cv::Mat(cv::Size(depthFrameColor.as<rs2::video_frame>().get_width(), depthFrameColor.as<rs2::video_frame>().get_height()), CV_8UC3, (void*)depthFrameColor.get_data(), cv::Mat::AUTO_STEP);
         // } else {
-        cv::Mat frameMono = cv::Mat(cv::Size(colorWidth, colorHeight), CV_8UC1);
-        _frameRaw(cv::Rect(0, YFILTER, colorWidth, colorHeight - (YFILTER * 2))).copyTo(frameMono(cv::Rect(0, YFILTER, colorWidth, colorHeight - (YFILTER * 2))));
+        cv::Mat frameMono = cv::Mat(cv::Size(irWidth, irHeight), CV_8UC1);
+        _frameRaw(cv::Rect(0, _yCrop, irWidth, irHeight - (_yCrop * 2))).copyTo(frameMono(cv::Rect(0, _yCrop, irWidth, irHeight - (_yCrop * 2))));
         cv::cvtColor(frameMono, _frame, cv::COLOR_GRAY2BGR);
         
             // _frame = cv::Mat(_frameRaw, cv::Rect(0, YFILTER, colorWidth, colorHeight - (YFILTER * 2)));
@@ -213,9 +213,9 @@ void Detector::run() {
     for (int i = 0; i < zarray_size(_detections); i++) {
 
         zarray_get(_detections, i, &_detectionInfo.det);
-        _detectionInfo.det->c[1] = _detectionInfo.det->c[1] + YFILTER;
+        _detectionInfo.det->c[1] = _detectionInfo.det->c[1] + _yCrop;
         for (int j = 0; j < 4; j++) {
-            _detectionInfo.det->p[j][1] = _detectionInfo.det->p[j][1] + YFILTER;
+            _detectionInfo.det->p[j][1] = _detectionInfo.det->p[j][1] + _yCrop;
         }
         zarray_set(_detections, i, &_detectionInfo.det, NULL);
 

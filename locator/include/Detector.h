@@ -53,11 +53,13 @@ public:
         return _poses;
     }
 
+    void setYCrop(int yCrop = 150) {
+        _yCrop = yCrop;
+    }
+
 private:
 
     void init();
-
-    const int YFILTER = 150;
 
     zarray_t* _detections;
     std::vector<Pose> _poses;
@@ -88,5 +90,7 @@ private:
     float _depthScale;
 
     bool _depthMap;
+
+    int _yCrop = 150;
 
 };
