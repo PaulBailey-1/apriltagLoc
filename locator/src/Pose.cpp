@@ -6,7 +6,7 @@ Pose::Pose() {
 
 }
 
-Pose::Pose(apriltag_pose_t pose, int id, double pixelsX, double focalX, double steroDistance) {
+Pose::Pose(apriltag_pose_t pose, int id, double pixelsX, double focalX, double steroDistance, Plane* plane) {
 
     _id = id;
 

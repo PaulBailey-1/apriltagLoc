@@ -1,4 +1,6 @@
 #include "Detector.h"
+#include "Point.h"
+
 #include <iostream>
 
 #include "opencv2/imgproc.hpp"
@@ -224,25 +226,38 @@ void Detector::run() {
             apriltag_pose_t apPose;
             double err = estimate_tag_pose(&_detectionInfo, &apPose);
 
-            double steroDistance = 0.0;
+            double steroDistanceCenter = 0.0;
+            double steroDistanceCorners[4];
+
             try {
+                steroDistanceCenter = depthFrame.get_distance((int)_detectionInfo.det->c[0], (int)_detectionInfo.det->c[1]);
 
-                float colorTagCenter[2];
-                float depthTagCenter[2];
+                for (int i = 0; i < 4; i++) {
+                    steroDistanceCorners[i] = depthFrame.get_distance((int)_detectionInfo.det->p[0], (int)_detectionInfo.det->p[1]);
+                }
 
-                colorTagCenter[0] = (int)_detectionInfo.det->c[0];
-                colorTagCenter[1] = (int)_detectionInfo.det->c[1];
-
-                depthTagCenter[0] = colorTagCenter[0];
-                depthTagCenter[1] = colorTagCenter[1];
-
-                steroDistance = depthFrame.get_distance(depthTagCenter[0], depthTagCenter[1]);
             } catch (const rs2::error & e) {
                 std::cerr << "RealSense error calling " << e.get_failed_function() << "(" << e.get_failed_args() << "):\n    " << e.what() << std::endl;
             }
 
-            double pixelsX = _detectionInfo.det->c[0] - (_img->width / 2);
-            _poses.push_back(Pose(apPose, _detectionInfo.det->id, pixelsX, _detectionInfo.fx, steroDistance));
+            double pixelXCenter = _detectionInfo.det->c[0] - (_img->width / 2);
+
+            double pixelCorners[4][2];
+            for (int i = 0; i < 4; i++) {
+                pixelCorners[i][0] = _detectionInfo.det->p[i][0] - (_img->width / 2);
+                pixelCorners[i][1] = _detectionInfo.det->p[i][1] - (_img->height / 2);
+            }
+
+            Point planePoints[4];
+            for (int i = 0; i < 4; i++) {
+                planePoints[i].x = (pixelCorners[i][0] / _detectionInfo.fx) * steroDistanceCorners[i];
+                planePoints[i].y = (pixelCorners[i][1] / _detectionInfo.fy) * steroDistanceCorners[i];
+                planePoints[i].z = steroDistanceCorners[i];
+            }
+
+            m_plane.fill(planePoints)
+            m_plane.fit();
+            _poses.push_back(Pose(apPose, _detectionInfo.det->id, pixelXCenter, _detectionInfo.fx, steroDistanceCenter, m_plane&));
 
         } else {
             zarray_remove_index(_detections, i, false);

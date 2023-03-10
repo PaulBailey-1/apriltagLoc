@@ -12,6 +12,7 @@ extern "C" {
 #include <fstream>
 
 #include "Pose.h"
+#include "Plane.h"
 
 class Detector {
 public:
@@ -92,5 +93,7 @@ private:
     bool _depthMap;
 
     int _yCrop = 150;
+
+    Plane m_plane;
 
 };
