@@ -1,0 +1,4 @@
+# Apriltag Localization
+This is a C++ implementation of an Apriltag based localization system, using the OpenCV, Apriltag, and Realsense libraries. It is designed to be run on a Raspberry Pi 4, with either the OV9281 global shutter camera, or the Realsense D435 stero depth camera. The locator application runs the Apriltag detector, which can then be used to solve for the cameras location with multiple different methods. The data from the system is pushed to a network through the wpilib NetworkTables, used for FRC robotics. The settings for detection and filtering are easily changeable, with a graphical display and command line options. Realsense configuration files will be loaded in as rsConfig.json, detection can be preformed on either the RGB or IR streams, utilizing depth measurements for localization. 
+
+<img src="https://github.com/PaulBailey-1/apriltagLoc/assets/64763623/77f0bdd5-bd2c-4466-805a-941f81c9a3e9" width="500">
